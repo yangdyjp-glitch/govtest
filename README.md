@@ -30,15 +30,18 @@ npm run dev
 
 GitHub main 分支通过 Railway 自动部署。仓库根目录的 `Dockerfile` 使用 Node.js 24 与 Next.js standalone 服务。Railway 服务设置使用 Dockerfile 构建，健康检查为 `/api/health`、等待上限 180 秒，失败重启最多 5 次。
 
-- 持久化卷挂载到 `/data`；单副本运行 SQLite，数据库和会话在服务重启、版本更新后保留。
+- 正式数据库为 Supabase PostgreSQL，使用独立 `govtest` schema。Railway 开启 IPv6 出站连接，以访问 Supabase 直连地址。
+- `DATABASE_URL` 在 Railway 变量中配置 PostgreSQL 连接串，密码只在服务端使用，不写入前端或仓库。
+- `DATABASE_SCHEMA=govtest`，连接池最多 5 个连接。SSL 验证证书与主机名，Supabase CA 证书位于 `db/certs/`；其他服务可使用 `DATABASE_CA_CERT` 配置 CA。
 - `PORT=8080`，域名目标端口也设为 8080。
-- `DATA_DIR=/data`。
 - `APP_URL=https://govtest-production.up.railway.app`，供写请求来源校验使用。
 - `INITIAL_ADMIN_USERNAME=admin`。
 - `INITIAL_ADMIN_PASSWORD_HASH` 为 scrypt 密码哈希，只在空数据库首次初始化时使用，格式为 `scrypt$盐值$哈希`。本地 setup 生成的 `.env.local` 对 `$` 有 dotenv 转义；设置 Railway 原始变量时去掉这些转义反斜杠。
 - 生产环境保持 Secure Cookie 默认值，不设置 `COOKIE_SECURE=false`。
 
-迁移在运行时、卷挂载后执行。`/api/health` 检查数据库并返回健康状态，缺少挂载卷或初始配置时不会报告成功。卷是持久化存储，不等同于备份；迁移或手工处理数据前应在 Railway 创建卷备份。
+PostgreSQL 迁移位于 `db/postgres/`，在首次运行时通过事务与数据库锁执行。`/api/health` 验证实际数据库访问，正常返回 `storage: postgresql`。应用 schema 不对公开角色授权，业务表启用 RLS 且没有匿名访问策略，所有业务访问经过后端鉴权。
+
+从 Railway SQLite 切换时保留 `/data` 卷，设置 `MIGRATE_SQLITE_PATH=/data/govtest.sqlite`。仅在目标无管理员且业务表为空时迁移，复制前生成 `.before-supabase` 备份，复制后逐表逐字段核对，并保留账号、密码哈希、会话和全部答题历史。数据复制与迁移标记在同一 PostgreSQL 事务中提交，后续重启不会重复导入。旧 SQLite 与备份文件继续保留；切换后的新记录只写入 PostgreSQL。
 
 早期 Sites 站点使用独立 D1 数据库；切换到 Railway 不会自动复制其中的题库或答题记录。
 
@@ -52,6 +55,8 @@ npm run test:integration
 ```
 
 接口测试自动启动 8788 端口服务，使用系统临时目录中的独立数据库，验证登录、权限、判分、全部作答后交卷、并发同步、文件导入，以及进程重启后的数据保留，结束后清理测试目录。端口需空闲，测试前先构建。
+
+设置 `TEST_DATABASE_URL` 后，接口测试会改用随机命名的 `govtest_test_*` PostgreSQL schema，结束后只清理本次测试 schema。同时设置 `TEST_MIGRATE_SQLITE=1` 可验证从 SQLite 迁移到 PostgreSQL 后原有账号、会话与成绩保持一致。测试连接需具备创建 schema 的权限。
 
 ## 导入说明
 

@@ -13,5 +13,7 @@ COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
 COPY --from=build /app/drizzle ./drizzle
+COPY --from=build /app/db/postgres ./db/postgres
+COPY --from=build /app/db/certs ./db/certs
 EXPOSE 8080
 CMD ["node", "server.js"]

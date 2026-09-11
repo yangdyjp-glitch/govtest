@@ -8,9 +8,11 @@ export async function GET() {
       {
         status: "ok",
         runtime: "node",
-        storage: process.env.RAILWAY_VOLUME_MOUNT_PATH
-          ? "persistent-volume"
-          : "local-file",
+        storage: process.env.DATABASE_URL
+          ? "postgresql"
+          : process.env.RAILWAY_VOLUME_MOUNT_PATH
+            ? "persistent-volume"
+            : "local-file",
       },
       { headers: { "Cache-Control": "no-store" } },
     );

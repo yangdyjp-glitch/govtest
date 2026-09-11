@@ -36,12 +36,12 @@ export async function GET(req: Request) {
     if (p[0] === "bootstrap") {
       const banks = await d
         .prepare(
-          "SELECT id,title,description,count,archived,created_at AS createdAt FROM banks WHERE archived=0 ORDER BY created_at DESC",
+          'SELECT id,title,description,count,archived,created_at AS "createdAt" FROM banks WHERE archived=0 ORDER BY created_at DESC',
         )
         .all();
       const active = await d
         .prepare(
-          "SELECT id,title,current,created_at AS createdAt FROM attempts WHERE user_id=? AND status='active' ORDER BY created_at DESC",
+          "SELECT id,title,current,created_at AS \"createdAt\" FROM attempts WHERE user_id=? AND status='active' ORDER BY created_at DESC",
         )
         .bind(user.id)
         .all();
@@ -91,7 +91,7 @@ export async function GET(req: Request) {
           (
             await d
               .prepare(
-                "SELECT id,title,description,count,archived,created_at AS createdAt FROM banks ORDER BY created_at DESC",
+                'SELECT id,title,description,count,archived,created_at AS "createdAt" FROM banks ORDER BY created_at DESC',
               )
               .all()
           ).results,
@@ -102,7 +102,7 @@ export async function GET(req: Request) {
           users: (
             await d
               .prepare(
-                "SELECT u.id,u.email,u.name,u.role,u.disabled,u.created_at AS createdAt,c.username FROM users u JOIN credentials c ON c.user_id=u.id ORDER BY u.created_at",
+                'SELECT u.id,u.email,u.name,u.role,u.disabled,u.created_at AS "createdAt",c.username FROM users u JOIN credentials c ON c.user_id=u.id ORDER BY u.created_at',
               )
               .all()
           ).results,

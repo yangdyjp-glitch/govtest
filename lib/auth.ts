@@ -48,7 +48,7 @@ export async function login(usernameInput: unknown, passwordInput: unknown) {
     now = Date.now();
   await d
     .prepare(
-      "INSERT INTO login_attempts (key,attempts,expires_at) VALUES (?,1,?) ON CONFLICT(key) DO UPDATE SET attempts=CASE WHEN expires_at<? THEN 1 ELSE attempts+1 END, expires_at=CASE WHEN expires_at<? THEN excluded.expires_at ELSE expires_at END",
+      "INSERT INTO login_attempts (key,attempts,expires_at) VALUES (?,1,?) ON CONFLICT(key) DO UPDATE SET attempts=CASE WHEN login_attempts.expires_at<? THEN 1 ELSE login_attempts.attempts+1 END, expires_at=CASE WHEN login_attempts.expires_at<? THEN excluded.expires_at ELSE login_attempts.expires_at END",
     )
     .bind(key, now + 15 * 60000, now, now)
     .run();

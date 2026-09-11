@@ -12,15 +12,15 @@
 
 ## 技术结构
 
-- React / TypeScript / Next.js 16，Node.js 24 + SQLite，Railway Docker 部署。原始题库文件只用于解析，不保存上传原件。
+- React / TypeScript / Next.js 16，Node.js 24 + Supabase PostgreSQL，Railway Docker 部署；本地无 DATABASE_URL 时可使用 SQLite。原始题库文件只用于解析，不保存上传原件。
 - `lib/domain.ts`：判分、事件与题库校验。
 - `lib/draft.ts`：本地待同步队列、恢复、重试、冲突合并。
 - `lib/server.ts` 与 `app/api/[...path]/route.ts`：身份鉴权、权限、存储、判分与题库管理。
 - `lib/importer.ts`：Excel / Markdown / Word 文本解析。
 - `components/`：桌面答题、结果、错题与管理页面。
-- `.data`：本地数据库；Railway 数据库位于 `/data/govtest.sqlite` 持久化卷。接口测试使用独立临时目录。
+- `.data`：本地 SQLite；正式数据位于 Supabase 的 govtest schema。原 Railway SQLite 卷保留为迁移备份。接口测试使用独立临时目录或随机 PostgreSQL schema。
 - 每次练习保存题目及答案快照，题库后续编辑不改变历史报告。
-- 同步事件带唯一编号；服务端使用乐观版本号和 SQLite 事务，防止重试重复入账或并发覆盖。错题从已交卷快照归集，避免双写导致不一致。
+- 同步事件带唯一编号；服务端使用乐观版本号和同连接数据库事务，防止重试重复入账或并发覆盖。PostgreSQL 毫秒时间字段使用 bigint。错题从已交卷快照归集，避免双写导致不一致。
 - 同浏览器使用 Web Locks 防止同一练习在多个标签页重复计时。跨设备的操作通过版本冲突合并；同一练习建议只在一台设备操作。
 
 ## 登录与权限
@@ -46,4 +46,4 @@
 
 `npm run test:integration` 自动启动独立 Node 服务，验证账号登录、密码更新、来源校验、权限、完整交卷、并发同步、幂等重试、历史快照、错题重做、五种文件扩展名和进程重启后的持久化。
 
-已执行 TypeScript 检查、生产构建、84 项接口检查、重启持久化检查和正式登录页截图检查。WebMCP 只注册一个读取练习概况的工具，尚未专门验证该浏览器扩展能力。
+已执行 TypeScript 检查、生产构建、SQLite 和 Supabase 上各 84 项接口检查、重启持久化检查、SQLite 到 PostgreSQL 的迁移检查和正式登录页截图检查。WebMCP 只注册一个读取练习概况的工具，尚未专门验证该浏览器扩展能力。

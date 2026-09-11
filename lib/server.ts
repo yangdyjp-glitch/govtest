@@ -155,7 +155,7 @@ export async function createAttempt(
 export async function seedDemo() {
   await db()
     .prepare(
-      "INSERT OR IGNORE INTO banks (id,title,description,questions,count,created_at) VALUES (?,?,?,?,?,?)",
+      "INSERT INTO banks (id,title,description,questions,count,created_at) VALUES (?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING",
     )
     .bind(
       "demo",

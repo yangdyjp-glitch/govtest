@@ -4,6 +4,8 @@ import { join, resolve, dirname, basename } from "node:path";
 import { randomBytes, scryptSync } from "node:crypto";
 import { spawn } from "node:child_process";
 import assert from "node:assert/strict";
+import pg from "pg";
+import { postgresConfig } from "../lib/postgres-config.ts";
 
 const directory = await mkdtemp(join(tmpdir(), "govtest-test-"));
 const password = randomBytes(24).toString("base64url");
@@ -19,6 +21,15 @@ const env = {
   TEST_ADMIN_PASSWORD: password,
 };
 delete env.RAILWAY_ENVIRONMENT_ID;
+delete env.DATABASE_URL;
+delete env.MIGRATE_SQLITE_PATH;
+const postgresUrl = process.env.TEST_DATABASE_URL;
+const migrateSqlite = !!postgresUrl && process.env.TEST_MIGRATE_SQLITE === "1";
+const schema = "govtest_test_" + randomBytes(8).toString("hex");
+if (postgresUrl && !migrateSqlite) {
+  env.DATABASE_URL = postgresUrl;
+  env.DATABASE_SCHEMA = schema;
+}
 let server;
 async function start() {
   server = spawn(
@@ -55,6 +66,11 @@ async function stop() {
 }
 try {
   await start();
+  const storage = await (await fetch(env.APP_URL + "/api/health")).json();
+  assert.equal(
+    storage.storage,
+    postgresUrl && !migrateSqlite ? "postgresql" : "local-file",
+  );
   const test = spawn(process.execPath, ["tests/integration.mjs"], {
     env,
     stdio: "inherit",
@@ -76,6 +92,11 @@ try {
   await stop();
   // A changed bootstrap password must never reset an existing administrator.
   env.INITIAL_ADMIN_PASSWORD_HASH = "";
+  if (migrateSqlite) {
+    env.DATABASE_URL = postgresUrl;
+    env.DATABASE_SCHEMA = schema;
+    env.MIGRATE_SQLITE_PATH = join(directory, "govtest.sqlite");
+  }
   await start();
   const after = await fetch(env.APP_URL + "/api/admin/users", {
     headers: { Cookie: cookie },
@@ -99,8 +120,28 @@ try {
   console.log(
     "Passed restart persistence checks: account, session, roles and results.",
   );
+  if (migrateSqlite) {
+    assert.equal(
+      (await (await fetch(env.APP_URL + "/api/health")).json()).storage,
+      "postgresql",
+    );
+    console.log(
+      "Passed SQLite to PostgreSQL migration checks, preserving existing sessions and results.",
+    );
+  }
 } finally {
   await stop();
+  if (postgresUrl) {
+    if (!/^govtest_test_[a-f0-9]{16}$/.test(schema))
+      throw new Error("Unexpected test schema");
+    const cleanup = new pg.Client(postgresConfig(postgresUrl));
+    try {
+      await cleanup.connect();
+      await cleanup.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
+    } finally {
+      await cleanup.end();
+    }
+  }
   if (
     dirname(resolve(directory)) !== resolve(tmpdir()) ||
     !basename(directory).startsWith("govtest-test-")
