@@ -288,6 +288,48 @@ check(
   parsed.questions.length === 2 && parsed.errors.length === 0,
   "Markdown import",
 );
+const repeatedPrompt = await upload(
+  "repeated-prompt.md",
+  `1. 下列句子没有明显语病的是：
+A. 第一句话
+B. 第二句话
+C. 第三句话
+D. 第四句话
+答案：A
+2. 下列句子没有明显语病的是：
+A. 另一组的第一句话
+B. 另一组的第二句话
+C. 另一组的第三句话
+D. 另一组的第四句话
+答案：B`,
+);
+check(
+  repeatedPrompt.errors.length === 0,
+  "same prompt with different options passes import preview",
+);
+const repeatedPromptBank = await req("admin/banks", {
+  title: "相同题干不同选项",
+  questions: repeatedPrompt.questions,
+});
+const repeatedPromptSaved = await req(`admin/banks/${repeatedPromptBank.id}`);
+check(
+  repeatedPromptSaved.questions.length === 2 &&
+    repeatedPromptSaved.questions[0].options.A !==
+      repeatedPromptSaved.questions[1].options.A,
+  "both same-prompt questions persist as separate questions",
+);
+await req(
+  "admin/banks",
+  {
+    title: "完整内容重复",
+    questions: [
+      repeatedPrompt.questions[0],
+      { ...repeatedPrompt.questions[0], sourceId: "2" },
+    ],
+  },
+  owner,
+  400,
+);
 const mathText = String.raw`1. 求 6\sqrt{2} 的值。
 A. \frac{1}{2}
 B. 2^{3}

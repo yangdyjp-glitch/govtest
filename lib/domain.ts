@@ -122,7 +122,7 @@ export function validateQuestions(input: unknown): string[] {
   if (input.length > 300) return ["每次最多导入 300 道题，请分批导入"];
   const errors: string[] = [];
   const ids = new Set<string>();
-  const stems = new Set<string>();
+  const contents = new Map<string, number>();
   input.forEach((q, i) => {
     const p = `第 ${i + 1} 题`;
     if (!q || typeof q !== "object") {
@@ -148,9 +148,24 @@ export function validateQuestions(input: unknown): string[] {
     if (q.sourceId && ids.has(q.sourceId))
       errors.push(`${p}题号重复：${q.sourceId}`);
     ids.add(q.sourceId);
-    const stem = (q.stem ?? "").replace(/\s/g, "");
-    if (stems.has(stem)) errors.push(`${p}题干重复，请核实后修改`);
-    stems.add(stem);
+    if (
+      typeof q.stem === "string" &&
+      typeof q.material === "string" &&
+      q.options &&
+      letters.every((key) => typeof q.options[key] === "string")
+    ) {
+      const content = JSON.stringify(
+        [q.stem, q.material, ...letters.map((key) => q.options[key])].map(
+          (text: string) => text.trim().replace(/\s+/g, " "),
+        ),
+      );
+      const previous = contents.get(content);
+      if (previous !== undefined)
+        errors.push(
+          `${p}与第 ${previous + 1} 题内容重复（题干、材料和四个选项相同），请核实后修改`,
+        );
+      else contents.set(content, i);
+    }
     for (const k of ["material", "explanation", "category"])
       if (typeof q[k] !== "string" || q[k].length > 30000)
         errors.push(`${p}${k}格式或长度错误`);

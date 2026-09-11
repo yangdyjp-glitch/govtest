@@ -45,3 +45,47 @@ test("imports reject missing choices, multiple answers and duplicate IDs", () =>
   assert.ok(validateQuestions([q, q]).length);
   assert.ok(validateQuestions([{ ...q, options: { A: "a" } }]).length);
 });
+
+test("repeated prompts are valid when options or shared materials differ", () => {
+  const q = {
+    sourceId: "42",
+    stem: "下列句子没有明显语病的是：",
+    material: "",
+    category: "言语理解与表达",
+    explanation: "",
+    answer: "A",
+    options: { A: "选项甲", B: "选项乙", C: "选项丙", D: "选项丁" },
+  };
+  assert.deepEqual(
+    validateQuestions([
+      q,
+      { ...q, sourceId: "43", options: { ...q.options, A: "另一句话" } },
+    ]),
+    [],
+  );
+  assert.deepEqual(
+    validateQuestions([q, { ...q, sourceId: "48", material: "另一组材料" }]),
+    [],
+  );
+  assert.deepEqual(
+    validateQuestions([
+      { ...q, stem: "Choose now here" },
+      { ...q, sourceId: "50", stem: "Choose nowhere" },
+    ]),
+    [],
+  );
+  const duplicate = {
+    ...q,
+    sourceId: "52",
+    stem: `  ${q.stem}\n`,
+    answer: "B",
+    explanation: "另一段解析",
+  };
+  assert.ok(
+    validateQuestions([q, duplicate]).some((error) =>
+      error.includes("第 2 题与第 1 题内容重复"),
+    ),
+  );
+  assert.doesNotThrow(() => validateQuestions([{ ...q, stem: 123 }]));
+  assert.ok(validateQuestions([{ ...q, stem: 123 }]).length);
+});
