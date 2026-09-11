@@ -545,7 +545,7 @@ textarea {
 }
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   margin-bottom: 26px;
   background: #fff;
   border: 1px solid var(--border);

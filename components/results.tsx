@@ -207,6 +207,12 @@ export function Results({
               note={`${stats.revised} / ${stats.total} 题，已加入错题集`}
             />
             <Stat
+              label="最终正确率"
+              value={(stats.firstRate + stats.revisedRate).toFixed(1)}
+              unit="%"
+              note={`${stats.first + stats.revised} / ${stats.total} 题，首次正确 + 修改正确`}
+            />
+            <Stat
               label="最终错误"
               value={String(stats.wrong)}
               unit="题"
