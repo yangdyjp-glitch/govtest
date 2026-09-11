@@ -287,6 +287,15 @@ check(
     central.questions[4].material.includes("部门"),
   "centralized Markdown answers and shared materials",
 );
+const inlineText = centralText.replace(
+  /^A\.[^\n]*\nB\.[^\n]*\nC\.[^\n]*\nD\.[^\n]*/gm,
+  (block) => block.replaceAll("\n", "　"),
+);
+const inlineParsed = await upload("inline-options.md", inlineText);
+check(
+  JSON.stringify(inlineParsed) === JSON.stringify(central),
+  "inline options preserve centralized answers and materials",
+);
 const wb = XLSX.utils.book_new();
 XLSX.utils.book_append_sheet(
   wb,
@@ -345,7 +354,7 @@ check(
 );
 zip.file(
   "word/document.xml",
-  `<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${centralText
+  `<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${inlineText
     .replace(/^#{1,6}\s*/gm, "")
     .split("\n")
     .map(

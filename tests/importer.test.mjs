@@ -58,6 +58,44 @@ test("answer matching uses IDs instead of answer order, including fullwidth synt
   assert.deepEqual(warnings, []);
 });
 
+test("four inline options, two-column options and fullwidth labels preserve every option", () => {
+  const expected = parseTextDocument(source);
+  const options = /^A\.[^\n]*\nB\.[^\n]*\nC\.[^\n]*\nD\.[^\n]*/gm;
+  const inline = source.replace(options, (block) =>
+    block.replaceAll("\n", "　"),
+  );
+  const twoColumns = source.replace(options, (block) => {
+    const rows = block.split("\n");
+    return `${rows[0]}\t${rows[1]}\n${rows[2]}  ${rows[3]}`;
+  });
+  const fullwidth = inline.replace(
+    /\b([A-D])\. /g,
+    (_, key) => String.fromCharCode(key.charCodeAt(0) + 0xfee0) + "．",
+  );
+  for (const text of [
+    inline,
+    twoColumns,
+    fullwidth,
+    inline.replace(/^#{1,6}\s*/gm, ""),
+  ]) {
+    assert.deepEqual(parseTextDocument(text), expected);
+  }
+});
+
+test("option text containing letter abbreviations and multiline content is preserved", () => {
+  const { questions } = parseTextDocument(
+    `1. 选择包含 C. elegans 的表述\nA. C. elegans 是一种线虫\n这是选项 A 的补充说明\nB. 另一个选项　C. 第三个选项　D. 第四个选项\n答案：A`,
+  );
+  assert.deepEqual(validateQuestions(questions), []);
+  assert.equal(
+    questions[0].options.A,
+    "C. elegans 是一种线虫\n这是选项 A 的补充说明",
+  );
+  assert.equal(questions[0].options.B, "另一个选项");
+  assert.equal(questions[0].options.C, "第三个选项");
+  assert.equal(questions[0].options.D, "第四个选项");
+});
+
 test("missing, conflicting and invalid answers stay invalid for preview correction", () => {
   const { questions, warnings } = parseTextDocument(
     source

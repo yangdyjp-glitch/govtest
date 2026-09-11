@@ -124,6 +124,34 @@ export function parseTextDocument(text: string) {
     if (!q) continue;
     const opt = line.match(/^([A-DＡ-Ｄ])[.、．:：）)\s]\s*(.*)$/i);
     if (opt) {
+      const inline = [
+        ...line.matchAll(/(?:^|\s+)([A-DＡ-Ｄ])[.、．:：）)]\s*/gi),
+      ];
+      const first = letters.indexOf(
+        opt[1].normalize("NFKC").toUpperCase() as Choice,
+      );
+      // Only split consecutive option labels at whitespace boundaries. Words such
+      // as "C. elegans" inside option A must remain part of that option's text.
+      if (
+        inline.length > 1 &&
+        inline[0].index === 0 &&
+        inline.every(
+          (match, index) =>
+            match[1].normalize("NFKC").toUpperCase() === letters[first + index],
+        )
+      ) {
+        inline.forEach((match, index) => {
+          const key = match[1].normalize("NFKC").toUpperCase() as Choice;
+          q!.options[key] = line
+            .slice(
+              match.index! + match[0].length,
+              inline[index + 1]?.index ?? line.length,
+            )
+            .trim();
+          field = key;
+        });
+        continue;
+      }
       const key = opt[1].normalize("NFKC").toUpperCase() as Choice;
       q.options[key] = opt[2];
       field = key;

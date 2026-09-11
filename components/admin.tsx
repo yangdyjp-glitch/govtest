@@ -536,7 +536,7 @@ export function Banks() {
                 />
               </div>
               <p className="muted spaced">
-                Word 与 Markdown
+                四个选项可以分行或同行排列。 Word 与 Markdown
                 支持逐题填写答案，也支持在文末“答案”标题下集中填写，如“1.B　2.C”。
                 分区标题和“根据下表回答51—55题”这类共用材料会按题号识别；图片题需另行整理为文字。
               </p>
