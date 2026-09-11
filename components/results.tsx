@@ -301,6 +301,7 @@ export function Results({
                 {[
                   "练习名称",
                   "答卷人",
+                  "第几次作答",
                   "交卷时间",
                   "首次正确率",
                   "修改正确率",
@@ -316,6 +317,15 @@ export function Results({
                 <TableRow key={r.id}>
                   <TableCell>{r.title}</TableCell>
                   <TableCell>{r.userName}</TableCell>
+                  <TableCell
+                    title={
+                      r.attemptNumber == null
+                        ? "错题专项复习不计入整套题库作答次数"
+                        : "按该答卷人对这套题库的交卷顺序统计"
+                    }
+                  >
+                    {r.attemptNumber == null ? "—" : `第 ${r.attemptNumber} 次`}
+                  </TableCell>
                   <TableCell>
                     {new Date(r.submittedAt).toLocaleString("zh-CN", {
                       hour12: false,

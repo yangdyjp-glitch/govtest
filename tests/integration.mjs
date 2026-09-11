@@ -206,6 +206,10 @@ check(
   res.find((x) => x.id === a.id).firstRate === 50,
   "rates use total questions",
 );
+check(
+  res.find((x) => x.id === a.id).attemptNumber === 1,
+  "first completed bank attempt has a numeric sequence number",
+);
 const wrong = await req("wrong", undefined, learner);
 const ids = new Set(
   bank.questions.filter((_, i) => [1, 2, 3, 4].includes(i)).map((q) => q.id),
@@ -441,7 +445,35 @@ check(
   (await req("admin/banks")).length === batchCountBefore + 2,
   "failed items create no banks",
 );
+async function finishAttempt(attempt, identity = learner) {
+  const synced = await req(
+    `attempts/${attempt.id}/sync`,
+    {
+      revision: attempt.revision,
+      events: attempt.questions.map((_, index) => event("answer", index, "A")),
+    },
+    identity,
+  );
+  return req(
+    `attempts/${attempt.id}/submit`,
+    { revision: synced.attempt.revision },
+    identity,
+  );
+}
+const unfinished = await req("attempts", { bankId: "demo" }, learner);
+const resumed = await req(`attempts/${unfinished.id}`, undefined, learner);
+check(resumed.id === unfinished.id, "resuming keeps the same attempt");
+const repeat = await finishAttempt(
+  await req("attempts", { bankId: "demo" }, learner),
+);
+const ownerAttempt = await finishAttempt(
+  await req("attempts", { bankId: "demo" }),
+  owner,
+);
 const snap = await req("attempts", { bankId: newBank.id }, learner);
+const submittedEarlier = await finishAttempt(
+  await req("attempts", { bankId: newBank.id }, learner),
+);
 const updated = structuredClone(parsed.questions);
 updated[0].answer = "D";
 await req(`admin/banks/${newBank.id}`, { title: "已更新", questions: updated });
@@ -450,8 +482,51 @@ check(
   snapRead.title === snap.title,
   "bank updates do not rewrite attempt snapshots",
 );
+await finishAttempt(snapRead);
+const afterRename = await finishAttempt(
+  await req("attempts", { bankId: newBank.id }, learner),
+);
+const sameTitleBank = await req("admin/banks", {
+  title: "已更新",
+  questions: parsed.questions,
+});
+const separateBankAttempt = await finishAttempt(
+  await req("attempts", { bankId: sameTitleBank.id }, learner),
+);
 await req(`admin/banks/${newBank.id}`, { action: "archive", archived: true });
 await req("attempts", { bankId: newBank.id }, learner, 404);
+const personalResults = await req("results", undefined, learner);
+const allResults = await req("results?scope=all");
+for (const [id, number] of [
+  [a.id, 1],
+  [repeat.id, 2],
+  [redo.id, null],
+  [submittedEarlier.id, 1],
+  [snap.id, 2],
+  [afterRename.id, 3],
+  [separateBankAttempt.id, 1],
+]) {
+  check(
+    personalResults.find((row) => row.id === id)?.attemptNumber === number &&
+      allResults.find((row) => row.id === id)?.attemptNumber === number,
+    `stable bank sequence for ${id} in personal and admin views`,
+  );
+}
+check(
+  allResults.find((row) => row.id === ownerAttempt.id)?.attemptNumber === 1 &&
+    (await req("results")).find((row) => row.id === ownerAttempt.id)
+      ?.attemptNumber === 1,
+  "each answerer has an independent sequence for the same bank",
+);
+check(
+  !allResults.some((row) => row.id === unfinished.id),
+  "unsubmitted and resumed attempts do not appear or increase completed counts",
+);
+check(
+  JSON.stringify(await req("results?scope=all", undefined, learner)) ===
+    JSON.stringify(personalResults),
+  "user cannot access other answerers by requesting all results",
+);
 await req(
   "admin/users",
   { action: "update", id: owner.id, role: "user", disabled: false },
@@ -496,5 +571,5 @@ await signIn(learner);
 await req("auth/logout", {}, learner);
 await req("bootstrap", undefined, learner, 401);
 console.log(
-  `Passed ${checks} integration checks: permissions, submission, classification, timing, sync conflicts, immutable snapshots, wrong-book review and all five file extensions.`,
+  `Passed ${checks} integration checks: permissions, submission, classification, timing, sync conflicts, immutable snapshots, per-answerer bank attempt numbers, wrong-book review and all five file extensions.`,
 );

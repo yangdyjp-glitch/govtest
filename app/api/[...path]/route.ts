@@ -55,10 +55,24 @@ export async function GET(req: Request) {
         new URL(req.url).searchParams.get("scope") === "all";
       const rows = await d
         .prepare(
-          `SELECT a.*,u.name AS user_name FROM attempts a JOIN users u ON u.id=a.user_id WHERE a.status='submitted' ${all ? "" : "AND a.user_id=?"} ORDER BY a.submitted_at DESC`,
+          `SELECT a.*,u.name AS user_name,
+            CASE WHEN a.bank_id='wrong' THEN NULL ELSE
+              ROW_NUMBER() OVER (
+                PARTITION BY a.user_id,a.bank_id
+                ORDER BY a.submitted_at ASC,a.created_at ASC,a.id ASC
+              )
+            END AS attempt_number
+          FROM attempts a JOIN users u ON u.id=a.user_id
+          WHERE a.status='submitted' ${all ? "" : "AND a.user_id=?"}
+          ORDER BY a.submitted_at DESC,a.created_at DESC,a.id DESC`,
         )
         .bind(...(all ? [] : [user.id]))
-        .all<AttemptRow & { user_name: string }>();
+        .all<
+          AttemptRow & {
+            user_name: string;
+            attempt_number: number | string | null;
+          }
+        >();
       return json(
         rows.results.map((row) => {
           const a = presentAttempt(row);
@@ -67,6 +81,8 @@ export async function GET(req: Request) {
             title: a.title,
             submittedAt: a.submittedAt,
             userName: row.user_name,
+            attemptNumber:
+              row.attempt_number === null ? null : Number(row.attempt_number),
             ...summarize(a.results!),
           };
         }),

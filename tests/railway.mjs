@@ -89,6 +89,12 @@ try {
       headers: { Cookie: cookie },
     })
   ).json();
+  const resultsBefore = await (
+    await fetch(env.APP_URL + "/api/results?scope=all", {
+      headers: { Cookie: cookie },
+    })
+  ).json();
+  assert.ok(resultsBefore.length > 0, "submitted results exist before restart");
   await stop();
   // A changed bootstrap password must never reset an existing administrator.
   env.INITIAL_ADMIN_PASSWORD_HASH = "";
@@ -112,10 +118,10 @@ try {
       headers: { Cookie: cookie },
     })
   ).json();
-  assert.equal(
-    results.length,
-    2,
-    "submitted results survive a process restart",
+  assert.deepEqual(
+    results,
+    resultsBefore,
+    "submitted results and attempt numbers survive a process restart",
   );
   console.log(
     "Passed restart persistence checks: account, session, roles and results.",
