@@ -1,6 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
-import { BookOpen, ChevronLeft, FileText, RotateCcw } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  BookOpen,
+  ChevronLeft,
+  FileText,
+  RotateCcw,
+} from "lucide-react";
 import {
   Table,
   TableHeader,
@@ -18,6 +26,8 @@ import {
 } from "@/components/ui/select";
 import { api } from "@/lib/client";
 import { QuestionMaterial } from "@/components/question-material";
+import { ResultAssessment } from "@/components/result-assessment";
+import { sortResults, type ResultSort } from "@/lib/result-analysis";
 import {
   duration,
   letters,
@@ -97,7 +107,7 @@ export function Results({
     [scope, setScope] = useState("mine"),
     [selected, setSelected] = useState(initialId),
     [attempt, setAttempt] = useState<Attempt | null>(null),
-    [index, setIndex] = useState<number | null>(null),
+    [sort, setSort] = useState<ResultSort>({ key: "number", direction: "asc" }),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true);
   useEffect(() => {
@@ -118,7 +128,7 @@ export function Results({
       .then((a) => {
         if (alive) {
           setAttempt(a);
-          setIndex(null);
+          setSort({ key: "number", direction: "asc" });
         }
       })
       .catch((e) => setError(e.message));
@@ -127,6 +137,16 @@ export function Results({
     };
   }, [selected]);
   const stats = attempt?.results ? summarize(attempt.results) : null;
+  const orderedResults = attempt?.results
+    ? sortResults(attempt.results, sort)
+    : [];
+  function changeSort(key: ResultSort["key"]) {
+    setSort((current) => ({
+      key,
+      direction:
+        current.key === key && current.direction === "asc" ? "desc" : "asc",
+    }));
+  }
   return (
     <>
       <div className="page-heading">
@@ -134,7 +154,7 @@ export function Results({
           <p className="eyebrow">RESULTS / 学习记录</p>
           <h1>结果分析</h1>
           <p className="muted">
-            区分首次判断与修改结果，回看每一道题的作答过程。
+            区分首次正确与修改正确，结合用时判断练习表现。
           </p>
         </div>
         {admin && !selected && (
@@ -212,77 +232,62 @@ export function Results({
               }}
             />
           </div>
-          {index !== null ? (
-            <>
-              <div className="subheading">
-                <button className="text-button" onClick={() => setIndex(null)}>
-                  <ChevronLeft size={15} /> 返回逐题分析
-                </button>
-                <div className="toolbar">
-                  <button
-                    className="button"
-                    disabled={index === 0}
-                    onClick={() => setIndex(index - 1)}
-                  >
-                    上一题
-                  </button>
-                  <span>
-                    {index + 1} / {stats.total}
-                  </span>
-                  <button
-                    className="button"
-                    disabled={index === stats.total - 1}
-                    onClick={() => setIndex(index + 1)}
-                  >
-                    下一题
-                  </button>
-                </div>
-              </div>
-              <Detail item={attempt.results![index]} />
-            </>
-          ) : (
-            <div className="table-wrap">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {[
-                      "题号",
-                      "分类",
-                      "你的答案",
-                      "正确答案",
-                      "作答结果",
-                      "累计用时",
-                      "",
-                    ].map((h) => (
-                      <TableHead key={h}>{h}</TableHead>
-                    ))}
+          <div className="subheading">
+            <h2>逐题结果</h2>
+            <span className="muted">
+              点击列名切换升序 / 降序；作答结果升序为最终错误 → 修改正确 →
+              首次正确
+            </span>
+          </div>
+          <div className="table-wrap">
+            <Table aria-label="逐题结果">
+              <TableHeader>
+                <TableRow>
+                  <SortableResultHead
+                    label="题号"
+                    field="number"
+                    sort={sort}
+                    onSort={changeSort}
+                  />
+                  <SortableResultHead
+                    label="分类"
+                    field="category"
+                    sort={sort}
+                    onSort={changeSort}
+                  />
+                  <TableHead>你的答案</TableHead>
+                  <TableHead>正确答案</TableHead>
+                  <SortableResultHead
+                    label="作答结果"
+                    field="outcome"
+                    sort={sort}
+                    onSort={changeSort}
+                  />
+                  <SortableResultHead
+                    label="累计用时"
+                    field="time"
+                    sort={sort}
+                    onSort={changeSort}
+                  />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {orderedResults.map(({ item: r, number }) => (
+                  <TableRow key={r.question.id}>
+                    <TableCell>{String(number).padStart(2, "0")}</TableCell>
+                    <TableCell>{r.question.category}</TableCell>
+                    <TableCell>{r.state.history.at(-1)}</TableCell>
+                    <TableCell>{r.question.answer}</TableCell>
+                    <TableCell>
+                      <Status value={r.outcome} />
+                    </TableCell>
+                    <TableCell>{duration(r.state.elapsedMs)}</TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {attempt.results!.map((r, i) => (
-                    <TableRow key={r.question.id}>
-                      <TableCell>{String(i + 1).padStart(2, "0")}</TableCell>
-                      <TableCell>{r.question.category}</TableCell>
-                      <TableCell>{r.state.history.at(-1)}</TableCell>
-                      <TableCell>{r.question.answer}</TableCell>
-                      <TableCell>
-                        <Status value={r.outcome} />
-                      </TableCell>
-                      <TableCell>{duration(r.state.elapsedMs)}</TableCell>
-                      <TableCell>
-                        <button
-                          className="link-button"
-                          onClick={() => setIndex(i)}
-                        >
-                          查看解析
-                        </button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <ResultAssessment key={attempt.id} results={attempt.results!} />
         </>
       ) : selected ? (
         <div className="empty-note">正在读取分析结果…</div>
@@ -340,6 +345,45 @@ export function Results({
         </div>
       )}
     </>
+  );
+}
+function SortableResultHead({
+  label,
+  field,
+  sort,
+  onSort,
+}: {
+  label: string;
+  field: ResultSort["key"];
+  sort: ResultSort;
+  onSort: (field: ResultSort["key"]) => void;
+}) {
+  const active = sort.key === field;
+  const Icon = active
+    ? sort.direction === "asc"
+      ? ArrowUp
+      : ArrowDown
+    : ArrowUpDown;
+  return (
+    <TableHead
+      aria-sort={
+        active
+          ? sort.direction === "asc"
+            ? "ascending"
+            : "descending"
+          : "none"
+      }
+    >
+      <button
+        type="button"
+        className={`result-sort-button ${active ? "active" : ""}`}
+        onClick={() => onSort(field)}
+        aria-label={`${label}：点击按${active && sort.direction === "asc" ? "降序" : "升序"}排列`}
+      >
+        {label}
+        <Icon size={14} aria-hidden="true" />
+      </button>
+    </TableHead>
   );
 }
 function Stat({

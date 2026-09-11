@@ -12,7 +12,7 @@
     "start": "node scripts/start.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
-    "test": "node --test tests/core.test.mjs tests/draft.test.mjs tests/importer.test.mjs",
+    "test": "node --test tests/core.test.mjs tests/draft.test.mjs tests/importer.test.mjs tests/result-analysis.test.mjs",
     "test:integration": "node tests/railway.mjs",
     "setup": "node scripts/bootstrap.mjs",
     "typecheck": "tsc --noEmit"

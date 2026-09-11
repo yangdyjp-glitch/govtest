@@ -873,6 +873,111 @@ textarea {
   text-align: center;
 }
 
+.result-sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  white-space: nowrap;
+}
+.result-sort-button.active {
+  color: var(--foreground);
+  font-weight: bold;
+}
+.result-assessment {
+  margin-top: 36px;
+  padding-top: 8px;
+  border-top: 2px solid #34342e;
+}
+.assessment-target {
+  width: 150px;
+  background: #fff;
+}
+.assessment-summary {
+  padding: 24px 28px;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+.assessment-summary.balanced {
+  border-color: #c8b66b;
+  background: var(--yellow-light);
+}
+.assessment-summary > h3 {
+  font-size: 23px;
+  margin-bottom: 8px;
+}
+.assessment-summary > p {
+  max-width: 76em;
+  line-height: 1.9;
+}
+.assessment-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.assessment-metrics > div {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+}
+.assessment-metrics span {
+  font-size: 14px;
+  color: #65655a;
+}
+.assessment-metrics strong {
+  font-size: 25px;
+  font-weight: normal;
+}
+.assessment-metrics small {
+  font-size: 13px;
+  color: #737368;
+}
+.assessment-table {
+  margin-top: 20px;
+}
+.assessment-table th,
+.assessment-table td {
+  padding: 14px 16px;
+}
+.assessment-table td:first-child,
+.assessment-table td:last-child {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.assessment-verdict {
+  font-size: 14px;
+}
+.assessment-verdict.balanced {
+  padding: 3px 8px;
+  background: var(--yellow-light);
+  border: 1px solid #ddcf8d;
+}
+.assessment-priorities {
+  margin-top: 24px;
+}
+.assessment-priorities ol {
+  margin: 12px 0 0;
+  padding-left: 24px;
+}
+.assessment-priorities li {
+  margin: 8px 0;
+  line-height: 1.9;
+  max-width: 90em;
+  overflow-wrap: anywhere;
+}
+.assessment-note {
+  margin-top: 20px;
+  font-size: 14px;
+  line-height: 1.9;
+  color: var(--muted);
+}
+
 @media (max-height: 850px) {
   .workspace {
     padding-top: 20px;
