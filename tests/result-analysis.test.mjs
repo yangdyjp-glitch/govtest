@@ -70,22 +70,22 @@ test("four sorts keep original numbers, numeric order and stable ties without mu
   );
   assert.deepEqual(rows, original);
 });
-test("five timing bands use exact inclusive inner and three-deviation boundaries", () => {
+test("five timing bands include one deviation in average and two in fast/slow", () => {
   for (const [value, expected] of [
-    [69, "very-fast"],
-    [70, "fast"],
+    [79.999, "very-fast"],
+    [80, "fast"],
     [89, "fast"],
     [90, "average"],
     [100, "average"],
     [110, "average"],
     [111, "slow"],
-    [130, "slow"],
-    [131, "very-slow"],
+    [120, "slow"],
+    [120.001, "very-slow"],
   ])
     assert.equal(speedBand(value, 100, 10), expected);
   assert.equal(speedBand(100, 100, 0), "average");
 });
-test("actual histogram, mean comparisons and bands reconcile using population deviation", () => {
+test("mean comparisons and band counts reconcile using population deviation", () => {
   const data = analyzeResults(
     [10, 20, 30, 40].map((s, i) => result(i, "first", s)),
   ).distribution;
@@ -98,7 +98,7 @@ test("actual histogram, mean comparisons and bands reconcile using population de
     [0, 1, 2, 1, 0],
   );
   assert.equal(
-    data.histogram.reduce((n, b) => n + b.count, 0),
+    data.bands.reduce((n, b) => n + b.count, 0),
     4,
   );
   near(
@@ -110,14 +110,17 @@ test("actual histogram, mean comparisons and bands reconcile using population de
   ).distribution;
   assert.deepEqual([odd.below, odd.equal, odd.above], [1, 1, 1]);
   const tail = analyzeResults(
-    [...Array(11).fill(100), 1000].map((s, i) => result(i, "wrong", s)),
-  ).distribution;
-  assert.equal(tail.bands.find((b) => b.key === "very-slow").count, 1);
-  assert.equal(tail.curve.length, 81);
+    [...Array(5).fill(100), 1000].map((s, i) => result(i, "wrong", s)),
+  );
+  for (const data of [tail.distribution, tail.categories[0].times]) {
+    assert.equal(data.bands.find((b) => b.key === "very-slow").count, 1);
+  }
   const lower = analyzeResults(
-    [10, ...Array(11).fill(100)].map((s, i) => result(i, "first", s)),
-  ).distribution;
-  assert.equal(lower.bands.find((b) => b.key === "very-fast").count, 1);
+    [10, ...Array(5).fill(100)].map((s, i) => result(i, "first", s)),
+  );
+  for (const data of [lower.distribution, lower.categories[0].times]) {
+    assert.equal(data.bands.find((b) => b.key === "very-fast").count, 1);
+  }
 });
 test("reference midpoints define ratios; matching proportional times yields no artificial winners", () => {
   const rows = moduleReferences.flatMap((ref, i) =>
@@ -283,7 +286,6 @@ test("zero/missing timing is excluded, equal times stay central, empty data rema
   ).distribution;
   assert.equal(equal.equal, 8);
   assert.equal(equal.deviation, 0);
-  assert.equal(equal.curve.length, 0);
   assert.equal(equal.bands[2].count, 8);
   const empty = analyzeResults([]);
   assert.equal(empty.distribution.mean, null);

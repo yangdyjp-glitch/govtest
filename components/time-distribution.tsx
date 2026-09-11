@@ -16,6 +16,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { outcomeLabels } from "@/lib/domain";
+import { OriginalQuestionButton } from "@/components/original-question";
 import {
   speedBands,
   type SpeedBand,
@@ -118,7 +119,6 @@ export function TimeDistribution({
       </div>
       {data.timed > 0 ? (
         <>
-          <DistributionChart data={data} />
           <div className="speed-band-grid" aria-label="用时分档">
             {data.bands.map((band) => (
               <button
@@ -153,7 +153,6 @@ export function TimeDistribution({
           {data.deviation === 0
             ? "本组已记录的用时一致，均归入“均值”档。"
             : "本组有效计时不足 5 题，分档仅供本次参考。"}
-          暂不绘制参考曲线。
         </p>
       )}
       {data.missing > 0 && (
@@ -222,6 +221,7 @@ export function TimeDistribution({
                       "累计用时",
                       `与${module ? "模块" : "全卷"}均值相比`,
                       "速度档",
+                      "原题",
                     ].map((label) => (
                       <TableHead key={label}>{label}</TableHead>
                     ))}
@@ -253,6 +253,12 @@ export function TimeDistribution({
                           "未计时"
                         )}
                       </TableCell>
+                      <TableCell>
+                        <OriginalQuestionButton
+                          item={row.item}
+                          number={row.number}
+                        />
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -263,103 +269,5 @@ export function TimeDistribution({
           ))}
       </div>
     </div>
-  );
-}
-
-function DistributionChart({ data }: { data: Distribution }) {
-  const left = 48,
-    right = 780,
-    top = 24,
-    bottom = 194,
-    width = right - left,
-    height = bottom - top;
-  const peak = Math.ceil(
-    Math.max(
-      1,
-      ...data.histogram.map((bin) => bin.count),
-      ...data.curve.map((point) => point.count),
-    ),
-  );
-  const x = (ms: number) => left + (ms / data.chartMax) * width;
-  const y = (count: number) => bottom - (count / peak) * height;
-  const line = data.curve
-    .map(
-      (point, index) =>
-        `${index ? "L" : "M"}${x(point.ms).toFixed(2)},${y(point.count).toFixed(2)}`,
-    )
-    .join(" ");
-  return (
-    <figure className="distribution-figure">
-      <figcaption>
-        <span>实际用时分布</span>
-        <span className="muted">
-          柱形：实测题数{data.curve.length > 0 ? " · 曲线：分布参考" : ""}
-        </span>
-      </figcaption>
-      <svg
-        viewBox="0 0 820 235"
-        role="img"
-        aria-label={`用时分布：共 ${data.timed} 题，平均 ${formatTime(data.mean)}，低于均值 ${data.below} 题，高于均值 ${data.above} 题`}
-      >
-        <line x1={left} y1={bottom} x2={right} y2={bottom} stroke="#bdbdb1" />
-        <text x={left - 8} y={top + 4} textAnchor="end">
-          {Math.ceil(peak)}
-        </text>
-        <text x={left - 8} y={bottom + 4} textAnchor="end">
-          0
-        </text>
-        <text x={left} y={14}>
-          题数
-        </text>
-        {data.histogram.map((bin, index) => (
-          <rect
-            key={index}
-            x={x(bin.start) + 2}
-            y={y(bin.count)}
-            width={Math.max(1, x(bin.end) - x(bin.start) - 4)}
-            height={bottom - y(bin.count)}
-            fill="#b9b9ad"
-          >
-            <title>{`${(bin.start / 1000).toFixed(1)}～${(bin.end / 1000).toFixed(1)} 秒：${bin.count} 题`}</title>
-          </rect>
-        ))}
-        {line && (
-          <path d={line} fill="none" stroke="#aa8b18" strokeWidth="2.5" />
-        )}
-        {data.mean !== null && (
-          <>
-            <line
-              x1={x(data.mean)}
-              y1={top}
-              x2={x(data.mean)}
-              y2={bottom}
-              stroke="#35352e"
-              strokeDasharray="4 4"
-            />
-            <text
-              x={Math.max(left + 36, Math.min(right - 36, x(data.mean)))}
-              y={top - 8}
-              textAnchor="middle"
-            >
-              平均用时
-            </text>
-          </>
-        )}
-        {[0, 1, 2, 3, 4].map((tick) => (
-          <text
-            key={tick}
-            x={left + (width * tick) / 4}
-            y={216}
-            textAnchor="middle"
-          >
-            {Number(((data.chartMax * tick) / 4 / 1000).toFixed(1))}
-          </text>
-        ))}
-        <text x={right + 12} y={216}>
-          秒
-        </text>
-      </svg>
-      <p className="muted">曲线仅作分布参考；题数和比例均按实际作答计算。</p>
-    </figure>
   );
 }

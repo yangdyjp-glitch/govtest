@@ -83,9 +83,9 @@ export function speedBand(
 ): SpeedBand {
   if (close(deviation, 0)) return "average";
   const z = (ms - mean) / deviation;
-  if (z < -3 && !close(z, -3)) return "very-fast";
+  if (z < -2 && !close(z, -2)) return "very-fast";
   if (z < -1 && !close(z, -1)) return "fast";
-  if (z > 3 && !close(z, 3)) return "very-slow";
+  if (z > 2 && !close(z, 2)) return "very-slow";
   if (z > 1 && !close(z, 1)) return "slow";
   return "average";
 }
@@ -131,36 +131,8 @@ export function timeDistribution(
     const count = rows.filter((row) => row.band === band.key).length;
     return { ...band, count, percent: timed ? (count / timed) * 100 : 0 };
   });
-  // Population deviation; histogram counts are actual observations, never theoretical shares.
   const minMs = timed ? values[0] : null,
     maxMs = timed ? values[timed - 1] : null;
-  const chartMax =
-    mean === null ? 1 : Math.max(maxMs!, mean + 3.3 * deviation, 1) * 1.05;
-  const binCount = Math.max(6, Math.min(14, Math.ceil(Math.sqrt(timed))));
-  const binWidth = chartMax / binCount;
-  const histogram = Array.from({ length: binCount }, (_, i) => ({
-    start: i * binWidth,
-    end: (i + 1) * binWidth,
-    count: 0,
-  }));
-  values.forEach(
-    (ms) =>
-      histogram[Math.min(binCount - 1, Math.floor(ms / binWidth))].count++,
-  );
-  const curve =
-    timed >= 5 && !close(deviation, 0) && mean !== null
-      ? Array.from({ length: 81 }, (_, i) => {
-          const ms = (chartMax * i) / 80;
-          return {
-            ms,
-            count:
-              (Math.exp(-0.5 * ((ms - mean) / deviation) ** 2) /
-                (deviation * Math.sqrt(2 * Math.PI))) *
-              timed *
-              binWidth,
-          };
-        })
-      : [];
   return {
     rows,
     total: source.length,
@@ -176,9 +148,6 @@ export function timeDistribution(
     equal: timed - below - above,
     above,
     bands,
-    histogram,
-    curve,
-    chartMax,
   };
 }
 function accuracy(rows: TimedQuestion[]) {

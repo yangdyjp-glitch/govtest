@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { api } from "@/lib/client";
 import { QuestionMaterial } from "@/components/question-material";
+import { OriginalQuestionButton } from "@/components/original-question";
 import { ResultAssessment } from "@/components/result-assessment";
 import { sortResults, type ResultSort } from "@/lib/result-analysis";
 import {
@@ -269,6 +270,7 @@ export function Results({
                     sort={sort}
                     onSort={changeSort}
                   />
+                  <TableHead>原题</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -282,6 +284,9 @@ export function Results({
                       <Status value={r.outcome} />
                     </TableCell>
                     <TableCell>{duration(r.state.elapsedMs)}</TableCell>
+                    <TableCell>
+                      <OriginalQuestionButton item={r} number={number} />
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
