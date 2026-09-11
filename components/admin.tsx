@@ -35,6 +35,12 @@ import {
 } from "@/components/ui/select";
 import { api, ApiError } from "@/lib/client";
 import { BatchImport } from "@/components/batch-import";
+import { MathReview } from "@/components/math-review";
+import {
+  prepareMathReview,
+  pendingMathReviews,
+  type ExpressionReview,
+} from "@/lib/math-review";
 import {
   type ImportItem,
   importIssues,
@@ -62,6 +68,7 @@ type DraftBank = {
   title: string;
   description: string;
   questions: Question[];
+  expressionReviews: ExpressionReview[];
 };
 export function Banks() {
   const [banks, setBanks] = useState<Bank[]>([]),
@@ -88,6 +95,9 @@ export function Banks() {
     void refresh();
   }, []);
   const errors = editing ? validateQuestions(editing.questions) : [];
+  const pendingExpressions = editing
+    ? pendingMathReviews(editing.questions, editing.expressionReviews).length
+    : 0;
   const updateImport = (key: string, patch: Partial<ImportItem>) =>
     setImports((current) =>
       current.map((item) => (item.key === key ? { ...item, ...patch } : item)),
@@ -109,6 +119,7 @@ export function Banks() {
           title: files[0].name.replace(/\.[^.]+$/, ""),
           description: "",
           questions: data.questions,
+          expressionReviews: data.expressionReviews,
         });
         setWarnings(data.warnings);
       } else {
@@ -119,6 +130,7 @@ export function Banks() {
           description: "",
           questions: [],
           warnings: [],
+          expressionReviews: [],
           status: "pending",
           error: "",
           locked: false,
@@ -150,6 +162,7 @@ export function Banks() {
         title: editing.title,
         description: editing.description,
         questions: editing.questions,
+        expressionReviews: editing.expressionReviews,
         error: "",
       });
     setImportEditing(null);
@@ -177,6 +190,7 @@ export function Banks() {
             title: item.title,
             description: item.description,
             questions: item.questions,
+            expressionReviews: item.expressionReviews,
           },
         );
         updateImport(item.key, {
@@ -207,6 +221,17 @@ export function Banks() {
   }
   async function save() {
     if (!editing) return;
+    const prepared = prepareMathReview(
+      editing.questions,
+      editing.expressionReviews,
+    );
+    if (
+      pendingMathReviews(prepared.questions, prepared.expressionReviews).length
+    ) {
+      setEditing({ ...editing, ...prepared });
+      setError("请先核对并确认数学表达，再保存题库。");
+      return;
+    }
     if (importEditing) {
       returnFromEditor();
       return;
@@ -234,7 +259,7 @@ export function Banks() {
         id: bank.id,
         title: bank.title,
         description: bank.description,
-        questions: data.questions,
+        ...prepareMathReview(data.questions),
       });
       setWarnings([]);
       setError("");
@@ -338,7 +363,12 @@ export function Banks() {
             className="button"
             disabled={busy}
             onClick={() => {
-              setEditing({ title: "", description: "", questions: [blank(1)] });
+              setEditing({
+                title: "",
+                description: "",
+                questions: [blank(1)],
+                expressionReviews: [],
+              });
               setWarnings([]);
               setError("");
             }}
@@ -394,6 +424,28 @@ export function Banks() {
               </p>
             </div>
           )}
+          <MathReview
+            questions={editing.questions}
+            reviews={editing.expressionReviews}
+            onConfirm={(index, confirmed) =>
+              setEditing(
+                (current) =>
+                  current && {
+                    ...current,
+                    expressionReviews: current.expressionReviews.map(
+                      (review, i) =>
+                        i === index ? { ...review, confirmed } : review,
+                    ),
+                  },
+              )
+            }
+            onEdit={(index) =>
+              setQuestion({
+                index,
+                q: structuredClone(editing.questions[index]),
+              })
+            }
+          />
           <div className="subheading">
             <h2>
               题目预览{" "}
@@ -413,7 +465,12 @@ export function Banks() {
               </button>
               <button
                 className="button primary"
-                disabled={busy || errors.length > 0 || !editing.title.trim()}
+                disabled={
+                  busy ||
+                  errors.length > 0 ||
+                  !editing.title.trim() ||
+                  pendingExpressions > 0
+                }
                 onClick={save}
               >
                 <Check size={16} />
@@ -482,6 +539,7 @@ export function Banks() {
                   title: item.title,
                   description: item.description,
                   questions: structuredClone(item.questions),
+                  expressionReviews: structuredClone(item.expressionReviews),
                 });
                 setWarnings(item.warnings);
                 setError("");
@@ -539,6 +597,7 @@ export function Banks() {
                 四个选项可以分行或同行排列。 Word 与 Markdown
                 支持逐题填写答案，也支持在文末“答案”标题下集中填写，如“1.B　2.C”。
                 分区标题和“根据下表回答51—55题”这类共用材料会按题号识别；图片题需另行整理为文字。
+                数学表达会自动整理，并在预览中列出调整前后对照，须人工确认后入库。
               </p>
             </div>
           )}
@@ -800,6 +859,17 @@ export function Banks() {
                         questions: editing.questions.filter(
                           (_, i) => i !== question.index,
                         ),
+                        expressionReviews: editing.expressionReviews
+                          .filter(
+                            (review) => review.questionIndex !== question.index,
+                          )
+                          .map((review) => ({
+                            ...review,
+                            questionIndex:
+                              review.questionIndex > question.index
+                                ? review.questionIndex - 1
+                                : review.questionIndex,
+                          })),
                       });
                     setQuestion(null);
                   }}
@@ -812,7 +882,10 @@ export function Banks() {
                     if (editing) {
                       const qs = [...editing.questions];
                       qs[question.index] = question.q;
-                      setEditing({ ...editing, questions: qs });
+                      setEditing({
+                        ...editing,
+                        ...prepareMathReview(qs, editing.expressionReviews),
+                      });
                     }
                     setQuestion(null);
                   }}

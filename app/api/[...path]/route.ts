@@ -22,6 +22,12 @@ import {
   type AnswerState,
 } from "@/lib/domain";
 import { parseFile } from "@/lib/importer";
+import {
+  expressionFields,
+  prepareMathReview,
+  pendingMathReviews,
+  type ExpressionReview,
+} from "@/lib/math-review";
 import { createAccount, resetPassword } from "@/lib/auth";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -313,6 +319,28 @@ export async function POST(req: Request) {
         }
         const errors = validateQuestions(body.questions);
         if (errors.length) throw new HttpError(400, errors.join("；"));
+        const expressionReviews: ExpressionReview[] = Array.isArray(
+          body.expressionReviews,
+        )
+          ? body.expressionReviews.filter(
+              (review: ExpressionReview) =>
+                review &&
+                Number.isInteger(review.questionIndex) &&
+                expressionFields.includes(review.field) &&
+                typeof review.before === "string" &&
+                typeof review.after === "string" &&
+                Array.isArray(review.notes),
+            )
+          : [];
+        const prepared = prepareMathReview(body.questions, expressionReviews);
+        if (
+          pendingMathReviews(prepared.questions, prepared.expressionReviews)
+            .length
+        )
+          throw new HttpError(
+            400,
+            "数学表达尚未人工确认，或确认后内容已修改，请在预览中核对后再保存。",
+          );
         const importing = body.action === "import";
         if (
           importing &&

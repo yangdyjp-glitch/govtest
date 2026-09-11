@@ -617,6 +617,40 @@ textarea {
   grid-template-columns: 240px 1fr;
   gap: 24px;
 }
+.math-review-item {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.math-review-comparison {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 12px 0;
+}
+.math-review-comparison > div {
+  background: var(--yellow-light);
+  border: 1px solid var(--border);
+  padding: 14px 16px;
+}
+.math-review-comparison > div:first-child {
+  background: #f7f7f3;
+}
+.math-review-comparison pre {
+  margin-top: 8px;
+  font: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 280px;
+  overflow: auto;
+}
+.math-review-confirm {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  cursor: pointer;
+}
 .result-detail {
   padding: 25px 28px;
   border: 1px solid var(--border);

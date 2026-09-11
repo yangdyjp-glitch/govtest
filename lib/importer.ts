@@ -2,6 +2,8 @@ import { Buffer } from "node:buffer";
 import * as XLSX from "xlsx";
 import mammoth from "mammoth";
 import WordExtractor from "word-extractor";
+import { prepareMathReview } from "./math-review";
+import { preserveWordMath } from "./word-math";
 import { blankQuestion, parseTextDocument } from "./text-importer";
 export { blankQuestion, parseText } from "./text-importer";
 import {
@@ -59,7 +61,9 @@ export async function parseFile(file: File) {
   } else if (extension === "xlsx" || extension === "xls")
     questions = parseWorkbook(buffer);
   else if (extension === "docx") {
-    const result = await mammoth.extractRawText({ buffer });
+    const result = await mammoth.extractRawText({
+      buffer: await preserveWordMath(buffer),
+    });
     questions = readText(result.value);
     warnings.push(
       "Word 以文字方式导入；请核对段落、表格及图片题。图片不自动导入。",
@@ -69,5 +73,10 @@ export async function parseFile(file: File) {
     questions = readText(doc.getBody());
     warnings.push("旧版 Word 以文字方式导入；请在预览中核对内容。");
   } else throw new Error("支持 .xlsx、.xls、.md、.docx、.doc 文件");
-  return { questions, errors: validateQuestions(questions), warnings };
+  const prepared = prepareMathReview(questions);
+  return {
+    ...prepared,
+    errors: validateQuestions(prepared.questions),
+    warnings,
+  };
 }

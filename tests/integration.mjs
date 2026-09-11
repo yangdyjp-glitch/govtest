@@ -2,6 +2,17 @@ import assert from "node:assert/strict";
 import * as XLSX from "xlsx";
 import JSZip from "jszip";
 import { readFile } from "node:fs/promises";
+import { prepareMathReview } from "../lib/math-review.ts";
+const confirmedMath = (questions) => {
+  const prepared = prepareMathReview(questions);
+  return {
+    ...prepared,
+    expressionReviews: prepared.expressionReviews.map((review) => ({
+      ...review,
+      confirmed: true,
+    })),
+  };
+};
 const origin = "http://127.0.0.1:8788";
 const owner = {
   username: "qa-owner",
@@ -277,6 +288,69 @@ check(
   parsed.questions.length === 2 && parsed.errors.length === 0,
   "Markdown import",
 );
+const mathText = String.raw`1. 求 6\sqrt{2} 的值。
+A. \frac{1}{2}
+B. 2^{3}
+C. 6
+D. 8
+答案：A`;
+const mathParsed = await upload("formula.md", mathText);
+check(
+  mathParsed.questions[0].stem.includes("6√(2)") &&
+    mathParsed.questions[0].options.A === "((1)/(2))" &&
+    mathParsed.questions[0].options.B === "2³",
+  "Markdown formulas are normalized before preview",
+);
+check(
+  mathParsed.expressionReviews.length === 3 &&
+    mathParsed.expressionReviews.every((review) => !review.confirmed),
+  "automatic changes require human confirmation",
+);
+await req(
+  "admin/banks",
+  {
+    title: "未确认的公式",
+    questions: mathParsed.questions,
+    expressionReviews: mathParsed.expressionReviews,
+  },
+  owner,
+  400,
+);
+await req(
+  "admin/banks",
+  {
+    title: "绕过预览的原始公式",
+    questions: [{ ...mathParsed.questions[0], stem: String.raw`6\sqrt{2}` }],
+  },
+  owner,
+  400,
+);
+const reviewedMath = {
+  questions: mathParsed.questions,
+  expressionReviews: mathParsed.expressionReviews.map((review) => ({
+    ...review,
+    confirmed: true,
+  })),
+};
+const mathBank = await req("admin/banks", {
+  title: "已确认的公式",
+  ...reviewedMath,
+});
+check(
+  (await req(`admin/banks/${mathBank.id}`)).questions[0].stem ===
+    mathParsed.questions[0].stem,
+  "confirmed readable expressions are persisted",
+);
+await req(
+  "admin/banks",
+  {
+    title: "确认后又修改",
+    ...reviewedMath,
+    questions: [{ ...mathParsed.questions[0], stem: "7√(2)" }],
+  },
+  owner,
+  400,
+);
 const centralText = await readFile(
   new URL("./fixtures/central-answers.md", import.meta.url),
   "utf8",
@@ -328,6 +402,35 @@ for (const ext of ["xlsx", "xls"]) {
     data.questions.length === 1 && data.questions[0].answer === "B",
     ext + " import",
   );
+  const formulas = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(
+    formulas,
+    XLSX.utils.json_to_sheet([
+      {
+        题号: "1",
+        题干: String.raw`6\sqrt{2}`,
+        A: String.raw`\frac{1}{2}`,
+        B: "2^{3}",
+        C: "6",
+        D: "8",
+        正确答案: "A",
+      },
+    ]),
+    "公式题",
+  );
+  const math = await upload(
+    "formula." + ext,
+    XLSX.write(formulas, {
+      type: "buffer",
+      bookType: ext === "xls" ? "biff8" : "xlsx",
+    }),
+  );
+  check(
+    math.questions[0].stem === "6√(2)" &&
+      math.questions[0].options.A === "((1)/(2))" &&
+      math.expressionReviews.length === 3,
+    ext + " formulas normalize and require review",
+  );
 }
 const zip = new JSZip();
 zip.file(
@@ -376,6 +479,32 @@ check(
     centralDocx.questions.map((q) => q.answer).join("") === "BCBDCC",
   "centralized Word answers",
 );
+zip.file(
+  "word/document.xml",
+  `<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><w:body>
+<w:p><w:r><w:t>1. 求</w:t></w:r><m:oMath><m:r><m:t>6</m:t></m:r><m:rad><m:deg/><m:e><m:r><m:t>2</m:t></m:r></m:e></m:rad></m:oMath></w:p>
+<w:p><w:r><w:t>A. </w:t></w:r><m:oMath><m:f><m:num><m:r><m:t>1</m:t></m:r></m:num><m:den><m:r><m:t>2</m:t></m:r></m:den></m:f></m:oMath></w:p>
+<w:p><w:r><w:t>B. </w:t></w:r><m:oMath><m:sSup><m:e><m:r><m:t>x</m:t></m:r></m:e><m:sup><m:r><m:t>2</m:t></m:r></m:sup></m:sSup></m:oMath></w:p>
+<w:p><w:r><w:t>C. </w:t></w:r><m:oMath><m:m><m:mr><m:e><m:r><m:t>a</m:t></m:r></m:e></m:mr></m:m></m:oMath></w:p>
+<w:p><w:r><w:t>D. 8</w:t></w:r></w:p><w:p><w:r><w:t>答案：A</w:t></w:r></w:p>
+</w:body></w:document>`,
+);
+const wordMath = await upload(
+  "native-formulas.docx",
+  await zip.generateAsync({ type: "nodebuffer" }),
+);
+check(
+  wordMath.questions[0].stem.includes("6√(2)") &&
+    wordMath.questions[0].options.A === "((1)/(2))" &&
+    wordMath.questions[0].options.B === "x²",
+  "Word equation objects survive text extraction and normalize",
+);
+check(
+  wordMath.questions[0].options.C.includes("待核对公式") &&
+    wordMath.expressionReviews.find((review) => review.field === "C").notes
+      .length > 0,
+  "unsupported Word equations are explicitly marked instead of silently lost",
+);
 const docBuffer = await readFile(
   new URL("./fixtures/sample.doc", import.meta.url),
 );
@@ -395,7 +524,7 @@ await req(
 const newBank = await req("admin/banks", {
   title: "导入校验 " + Date.now(),
   description: "test",
-  questions: parsed.questions,
+  ...confirmedMath(parsed.questions),
 });
 const batchCountBefore = (await req("admin/banks")).length;
 const bulkItems = [parsed, central].map((data, index) => ({
@@ -403,7 +532,7 @@ const bulkItems = [parsed, central].map((data, index) => ({
   importKey: crypto.randomUUID(),
   title: `批量导入验证 ${index + 1}`,
   description: "混合题库批量保存验证",
-  questions: data.questions,
+  ...confirmedMath(data.questions),
 }));
 for (const item of bulkItems) {
   const saved = await req("admin/banks", item);
@@ -476,7 +605,10 @@ const submittedEarlier = await finishAttempt(
 );
 const updated = structuredClone(parsed.questions);
 updated[0].answer = "D";
-await req(`admin/banks/${newBank.id}`, { title: "已更新", questions: updated });
+await req(`admin/banks/${newBank.id}`, {
+  title: "已更新",
+  ...confirmedMath(updated),
+});
 const snapRead = await req(`attempts/${snap.id}`, undefined, learner);
 check(
   snapRead.title === snap.title,
@@ -488,7 +620,7 @@ const afterRename = await finishAttempt(
 );
 const sameTitleBank = await req("admin/banks", {
   title: "已更新",
-  questions: parsed.questions,
+  ...confirmedMath(parsed.questions),
 });
 const separateBankAttempt = await finishAttempt(
   await req("attempts", { bankId: sameTitleBank.id }, learner),
