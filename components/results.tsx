@@ -17,6 +17,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { api } from "@/lib/client";
+import { QuestionMaterial } from "@/components/question-material";
 import {
   duration,
   letters,
@@ -41,7 +42,7 @@ export function Detail({ item }: { item: ResultItem }) {
         </span>
         <Status value={item.outcome} />
       </div>
-      {q.material && <div className="material">{q.material}</div>}
+      {q.material && <QuestionMaterial text={q.material} />}
       <p className="stem">{q.stem}</p>
       <div className="result-options">
         {letters.map((k) => (

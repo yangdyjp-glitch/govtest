@@ -357,6 +357,22 @@ textarea {
   line-height: 2;
   margin-bottom: 24px;
 }
+.material-table {
+  margin: 12px 0;
+  border-collapse: collapse;
+  font-size: inherit;
+  white-space: normal;
+}
+.material-table th,
+.material-table td {
+  border: 1px solid #d5d5c9;
+  padding: 7px 16px;
+  white-space: normal;
+}
+.material-table th {
+  background: #eeeee8;
+  font-weight: bold;
+}
 .options {
   gap: 12px;
 }

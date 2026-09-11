@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Progress } from "@/components/ui/progress";
+import { QuestionMaterial } from "@/components/question-material";
 import {
   Dialog,
   DialogContent,
@@ -320,7 +321,7 @@ export function Exam({
             </button>
           </div>
           <div className="question-content">
-            {q.material && <div className="material">{q.material}</div>}
+            {q.material && <QuestionMaterial text={q.material} />}
             <div className="question-title">
               <span className="question-index">
                 {String(index + 1).padStart(2, "0")}

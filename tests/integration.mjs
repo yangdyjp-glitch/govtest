@@ -273,6 +273,20 @@ check(
   parsed.questions.length === 2 && parsed.errors.length === 0,
   "Markdown import",
 );
+const centralText = await readFile(
+  new URL("./fixtures/central-answers.md", import.meta.url),
+  "utf8",
+);
+const central = await upload("central.md", centralText);
+check(
+  central.questions.length === 6 &&
+    central.errors.length === 0 &&
+    central.warnings.length === 0 &&
+    central.questions.map((q) => q.answer).join("") === "BCBDCC" &&
+    central.questions[2].material.includes("销售额") &&
+    central.questions[4].material.includes("部门"),
+  "centralized Markdown answers and shared materials",
+);
 const wb = XLSX.utils.book_new();
 XLSX.utils.book_append_sheet(
   wb,
@@ -328,6 +342,26 @@ const docx = await upload(
 check(
   docx.questions.length === 2 && docx.errors.length === 0,
   "Word DOCX import",
+);
+zip.file(
+  "word/document.xml",
+  `<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${centralText
+    .replace(/^#{1,6}\s*/gm, "")
+    .split("\n")
+    .map(
+      (s) =>
+        `<w:p><w:r><w:t>${s.replaceAll("&", "&amp;").replaceAll("<", "&lt;")}</w:t></w:r></w:p>`,
+    )
+    .join("")}</w:body></w:document>`,
+);
+const centralDocx = await upload(
+  "central.docx",
+  await zip.generateAsync({ type: "nodebuffer" }),
+);
+check(
+  centralDocx.errors.length === 0 &&
+    centralDocx.questions.map((q) => q.answer).join("") === "BCBDCC",
+  "centralized Word answers",
 );
 const docBuffer = await readFile(
   new URL("./fixtures/sample.doc", import.meta.url),
