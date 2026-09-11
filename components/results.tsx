@@ -300,7 +300,7 @@ export function Results({
               <TableRow>
                 {[
                   "练习名称",
-                  ...(scope === "all" ? ["用户"] : []),
+                  "答卷人",
                   "交卷时间",
                   "首次正确率",
                   "修改正确率",
@@ -315,7 +315,7 @@ export function Results({
               {rows.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell>{r.title}</TableCell>
-                  {scope === "all" && <TableCell>{r.userName}</TableCell>}
+                  <TableCell>{r.userName}</TableCell>
                   <TableCell>
                     {new Date(r.submittedAt).toLocaleString("zh-CN", {
                       hour12: false,
