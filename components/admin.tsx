@@ -10,6 +10,7 @@ import {
   Users,
   BookOpen,
   ChevronLeft,
+  TextCursorInput,
 } from "lucide-react";
 import {
   Table,
@@ -59,6 +60,9 @@ type DraftBank = {
 export function Banks() {
   const [banks, setBanks] = useState<Bank[]>([]),
     [editing, setEditing] = useState<DraftBank | null>(null),
+    [renaming, setRenaming] = useState<Bank | null>(null),
+    [renameTitle, setRenameTitle] = useState(""),
+    [renameError, setRenameError] = useState(""),
     [question, setQuestion] = useState<{ index: number; q: Question } | null>(
       null,
     ),
@@ -133,6 +137,28 @@ export function Banks() {
       setError("");
     } catch (e) {
       setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function rename() {
+    if (!renaming || busy || !renameTitle.trim()) return;
+    setBusy(true);
+    setRenameError("");
+    try {
+      const result = await api<{ id: string; title: string }>(
+        `admin/banks/${renaming.id}`,
+        { action: "rename", title: renameTitle.trim() },
+      );
+      setBanks((current) =>
+        current.map((bank) =>
+          bank.id === result.id ? { ...bank, title: result.title } : bank,
+        ),
+      );
+      setNotice(`题库已重命名为「${result.title}」。`);
+      setRenaming(null);
+    } catch (e) {
+      setRenameError((e as Error).message);
     } finally {
       setBusy(false);
     }
@@ -407,6 +433,20 @@ export function Banks() {
                       <button
                         className="text-button"
                         disabled={busy}
+                        onClick={() => {
+                          setRenaming(b);
+                          setRenameTitle(b.title);
+                          setRenameError("");
+                          setError("");
+                          setNotice("");
+                        }}
+                      >
+                        <TextCursorInput size={15} />
+                        重命名
+                      </button>
+                      <button
+                        className="text-button"
+                        disabled={busy}
                         onClick={() => edit(b)}
                       >
                         <Pencil size={15} />
@@ -439,6 +479,66 @@ export function Banks() {
           )}
         </>
       )}
+      <Dialog
+        open={!!renaming}
+        onOpenChange={(open) => {
+          if (!open && !busy) setRenaming(null);
+        }}
+      >
+        <DialogContent className="dialog-content" style={{ maxWidth: 520 }}>
+          <DialogTitle>重命名题库</DialogTitle>
+          <DialogDescription>
+            修改这套题在题库列表中显示的名称。
+          </DialogDescription>
+          <form
+            className="stack"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void rename();
+            }}
+          >
+            <label className="field">
+              题库名称
+              <input
+                required
+                autoFocus
+                maxLength={120}
+                value={renameTitle}
+                disabled={busy}
+                onFocus={(e) => e.currentTarget.select()}
+                onChange={(e) => setRenameTitle(e.target.value)}
+              />
+            </label>
+            <p className="muted">最多 120 字</p>
+            {renameError && (
+              <p className="danger-message" role="alert">
+                {renameError}
+              </p>
+            )}
+            <div className="toolbar" style={{ justifyContent: "flex-end" }}>
+              <button
+                className="button"
+                type="button"
+                disabled={busy}
+                onClick={() => setRenaming(null)}
+              >
+                取消
+              </button>
+              <button
+                className="button primary"
+                type="submit"
+                disabled={
+                  busy ||
+                  !renameTitle.trim() ||
+                  renameTitle.trim() === renaming?.title
+                }
+              >
+                {busy ? "正在保存…" : "保存名称"}
+              </button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
       <Dialog
         open={!!question}
         onOpenChange={(open) => {

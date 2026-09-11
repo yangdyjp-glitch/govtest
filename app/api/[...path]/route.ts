@@ -280,14 +280,23 @@ export async function POST(req: Request) {
             .run();
           return json({ ok: true });
         }
-        const errors = validateQuestions(body.questions);
-        if (errors.length) throw new HttpError(400, errors.join("；"));
         if (
           typeof body.title !== "string" ||
           !body.title.trim() ||
           body.title.length > 120
         )
           throw new HttpError(400, "请填写题库名称（最多 120 字）");
+        if (body.action === "rename") {
+          if (!p[2]) throw new HttpError(400, "请选择要重命名的题库");
+          const result = await d
+            .prepare("UPDATE banks SET title=? WHERE id=?")
+            .bind(body.title.trim(), p[2])
+            .run();
+          if (!result.meta.changes) throw new HttpError(404, "题库不存在");
+          return json({ id: p[2], title: body.title.trim() });
+        }
+        const errors = validateQuestions(body.questions);
+        if (errors.length) throw new HttpError(400, errors.join("；"));
         const id = p[2] || crypto.randomUUID();
         let previous: Question[] = [];
         if (p[2]) {
