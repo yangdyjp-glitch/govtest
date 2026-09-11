@@ -34,8 +34,7 @@ function deltaText(ms: number | null) {
   if (!ms) return "与均值相同";
   return `${ms < 0 ? "快" : "慢"} ${Number((Math.abs(ms) / 1000).toFixed(1))} 秒`;
 }
-type Filter =
-  SpeedBand | "below" | "equal" | "above" | "missing" | "all" | null;
+type Filter = SpeedBand | "missing" | "all" | null;
 export function TimeDistribution({
   data,
   module = false,
@@ -50,9 +49,6 @@ export function TimeDistribution({
     .filter((row) => {
       if (filter === "all") return true;
       if (filter === "missing") return row.ms === null;
-      if (filter === "below") return row.deltaMs !== null && row.deltaMs < 0;
-      if (filter === "equal") return row.deltaMs === 0;
-      if (filter === "above") return row.deltaMs !== null && row.deltaMs > 0;
       return row.band === filter;
     })
     .sort((a, b) => {
@@ -66,15 +62,10 @@ export function TimeDistribution({
     speedBands.find((band) => band.key === filter)?.label ??
     (
       {
-        below: "低于平均用时",
-        equal: "等于平均用时",
-        above: "高于平均用时",
         missing: "缺少计时",
         all: "全部题目",
       } as Record<string, string>
     )[filter ?? "all"];
-  const percent = (count: number) =>
-    data.timed ? ((count / data.timed) * 100).toFixed(1) : "0.0";
   function choose(value: Filter) {
     setFilter(value);
   }
@@ -91,52 +82,37 @@ export function TimeDistribution({
       .join("、") + (rows.length > 5 ? ` 等 ${rows.length} 题` : "");
   return (
     <div className="timing-distribution">
-      <div className="timing-overview">
-        <div>
+      <div className="timing-summary">
+        <div className="timing-average">
           <span>平均用时</span>
-          <strong>{formatTime(data.mean)}</strong>
-          <small>中位用时 {formatTime(data.median)}</small>
-        </div>
-        {(
-          [
-            ["below", "低于平均用时", data.below],
-            ["equal", "等于平均用时", data.equal],
-            ["above", "高于平均用时", data.above],
-          ] as const
-        ).map(([key, label, count]) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => choose(key)}
-            aria-pressed={filter === key}
-            aria-controls={tableId}
+          <strong
+            className={data.mean === null ? "muted" : "timing-average-value"}
           >
-            <span>{label}</span>
-            <strong>{count} 题</strong>
-            <small>{percent(count)}%</small>
-          </button>
-        ))}
+            {formatTime(data.mean)}
+          </strong>
+        </div>
+        <div className="speed-band-grid" aria-label="用时分档">
+          {data.bands.map((band) => (
+            <button
+              type="button"
+              key={band.key}
+              className={`speed-band-card speed-${band.key}`}
+              onClick={() => choose(band.key)}
+              disabled={!data.timed}
+              aria-pressed={filter === band.key}
+              aria-controls={tableId}
+            >
+              <span>{band.label}</span>
+              <strong>{band.count} 题</strong>
+              <small>{band.percent.toFixed(1)}%</small>
+            </button>
+          ))}
+        </div>
       </div>
       {data.timed > 0 ? (
         <>
-          <div className="speed-band-grid" aria-label="用时分档">
-            {data.bands.map((band) => (
-              <button
-                type="button"
-                key={band.key}
-                className={`speed-band-card speed-${band.key}`}
-                onClick={() => choose(band.key)}
-                aria-pressed={filter === band.key}
-                aria-controls={tableId}
-              >
-                <span>{band.label}</span>
-                <strong>{band.count} 题</strong>
-                <small>{band.percent.toFixed(1)}%</small>
-              </button>
-            ))}
-          </div>
           <p className="assessment-note">
-            “均值”表示平均用时附近；上方“等于平均用时”仅统计用时相同的题目。点击题数可查看对应题号。
+            “均值”表示平均用时附近。点击快慢档可查看对应题目。
           </p>
           {module && (
             <p className="timing-extremes">
