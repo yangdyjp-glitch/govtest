@@ -33,7 +33,13 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { api } from "@/lib/client";
+import { api, ApiError } from "@/lib/client";
+import { BatchImport } from "@/components/batch-import";
+import {
+  type ImportItem,
+  importIssues,
+  readQuestionFile,
+} from "@/lib/batch-import";
 import {
   letters,
   validateQuestions,
@@ -60,6 +66,8 @@ type DraftBank = {
 export function Banks() {
   const [banks, setBanks] = useState<Bank[]>([]),
     [editing, setEditing] = useState<DraftBank | null>(null),
+    [imports, setImports] = useState<ImportItem[]>([]),
+    [importEditing, setImportEditing] = useState<string | null>(null),
     [renaming, setRenaming] = useState<Bank | null>(null),
     [renameTitle, setRenameTitle] = useState(""),
     [renameError, setRenameError] = useState(""),
@@ -80,34 +88,129 @@ export function Banks() {
     void refresh();
   }, []);
   const errors = editing ? validateQuestions(editing.questions) : [];
-  async function upload(file: File) {
+  const updateImport = (key: string, patch: Partial<ImportItem>) =>
+    setImports((current) =>
+      current.map((item) => (item.key === key ? { ...item, ...patch } : item)),
+    );
+  async function upload(files: File[]) {
+    if (!files.length || busy) return;
+    if (files.length > 20) {
+      setError("一次最多选择 20 个文件，请分批导入");
+      return;
+    }
     setBusy(true);
     setError("");
+    setNotice("");
     try {
-      const r = await fetch("/api/admin/import", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/octet-stream",
-          "X-File-Name": encodeURIComponent(file.name),
-        },
-        body: file,
-      });
-      const data: any = await r.json();
-      if (!r.ok) throw new Error(data.error);
-      setEditing({
-        title: file.name.replace(/\.[^.]+$/, ""),
-        description: "",
-        questions: data.questions,
-      });
-      setWarnings(data.warnings || []);
+      if (files.length === 1) {
+        const data = await readQuestionFile(files[0]);
+        setImportEditing(null);
+        setEditing({
+          title: files[0].name.replace(/\.[^.]+$/, ""),
+          description: "",
+          questions: data.questions,
+        });
+        setWarnings(data.warnings);
+      } else {
+        const items: ImportItem[] = files.map((file) => ({
+          key: crypto.randomUUID(),
+          filename: file.name,
+          title: file.name.replace(/\.[^.]+$/, ""),
+          description: "",
+          questions: [],
+          warnings: [],
+          status: "pending",
+          error: "",
+          locked: false,
+        }));
+        setImports(items);
+        for (let index = 0; index < files.length; index++) {
+          const key = items[index].key;
+          updateImport(key, { status: "reading" });
+          try {
+            const data = await readQuestionFile(files[index]);
+            updateImport(key, { ...data, status: "ready" });
+          } catch (e) {
+            updateImport(key, {
+              status: "failed",
+              error: (e as Error).message,
+            });
+          }
+        }
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
     }
   }
+  function returnFromEditor() {
+    if (importEditing && editing)
+      updateImport(importEditing, {
+        title: editing.title,
+        description: editing.description,
+        questions: editing.questions,
+        error: "",
+      });
+    setImportEditing(null);
+    setEditing(null);
+    setError("");
+  }
+  async function saveImports() {
+    if (busy) return;
+    const ready = imports.filter(
+      (item) => item.status === "ready" && !importIssues(item).length,
+    );
+    if (!ready.length) return;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    let saved = 0;
+    for (const item of ready) {
+      updateImport(item.key, { status: "saving", locked: true, error: "" });
+      try {
+        const result = await api<{ id: string; title: string; count: number }>(
+          "admin/banks",
+          {
+            action: "import",
+            importKey: item.key,
+            title: item.title,
+            description: item.description,
+            questions: item.questions,
+          },
+        );
+        updateImport(item.key, {
+          status: "saved",
+          title: result.title,
+          error: "",
+        });
+        saved++;
+      } catch (e) {
+        // Keep the same import key after an uncertain reply so retries cannot duplicate a bank.
+        const locked = !(
+          e instanceof ApiError &&
+          e.status >= 400 &&
+          e.status < 500
+        );
+        updateImport(item.key, {
+          status: "ready",
+          locked,
+          error: `保存失败：${(e as Error).message}${locked ? "。请重试批量保存以确认结果。" : ""}`,
+        });
+      }
+    }
+    setNotice(
+      `本次已保存 ${saved} 套题库${saved < ready.length ? `，${ready.length - saved} 套保存失败，可重试` : ""}。`,
+    );
+    await refresh();
+    setBusy(false);
+  }
   async function save() {
     if (!editing) return;
+    if (importEditing) {
+      returnFromEditor();
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -226,19 +329,14 @@ export function Banks() {
           </p>
         </div>
         {editing ? (
-          <button
-            className="button"
-            disabled={busy}
-            onClick={() => {
-              setEditing(null);
-              setError("");
-            }}
-          >
-            <ChevronLeft size={16} /> 返回题库列表
+          <button className="button" disabled={busy} onClick={returnFromEditor}>
+            <ChevronLeft size={16} />{" "}
+            {importEditing ? "返回批量预览" : "返回题库列表"}
           </button>
         ) : (
           <button
             className="button"
+            disabled={busy}
             onClick={() => {
               setEditing({ title: "", description: "", questions: [blank(1)] });
               setWarnings([]);
@@ -319,7 +417,11 @@ export function Banks() {
                 onClick={save}
               >
                 <Check size={16} />
-                {busy ? "正在保存…" : "确认保存题库"}
+                {busy
+                  ? "正在保存…"
+                  : importEditing
+                    ? "保存到批量预览"
+                    : "确认保存题库"}
               </button>
             </div>
           </div>
@@ -369,49 +471,77 @@ export function Banks() {
         </div>
       ) : (
         <>
-          <div className="panel" style={{ marginBottom: 28 }}>
-            <div className="section-head">
-              <h2>导入题库</h2>
-              <div className="toolbar">
-                <button className="text-button" onClick={excelTemplate}>
-                  <Download size={15} /> Excel 模板
-                </button>
-                <a
-                  className="text-button"
-                  href="/templates/questions.md"
-                  download
-                >
-                  <Download size={15} /> Markdown 模板
-                </a>
+          {imports.length > 0 ? (
+            <BatchImport
+              items={imports}
+              busy={busy}
+              onTitle={(key, title) => updateImport(key, { title, error: "" })}
+              onPreview={(item) => {
+                setImportEditing(item.key);
+                setEditing({
+                  title: item.title,
+                  description: item.description,
+                  questions: structuredClone(item.questions),
+                });
+                setWarnings(item.warnings);
+                setError("");
+              }}
+              onRemove={(key) =>
+                setImports((current) =>
+                  current.filter((item) => item.key !== key),
+                )
+              }
+              onSave={() => void saveImports()}
+              onFinish={() => setImports([])}
+            />
+          ) : (
+            <div className="panel" style={{ marginBottom: 28 }}>
+              <div className="section-head">
+                <h2>导入题库</h2>
+                <div className="toolbar">
+                  <button className="text-button" onClick={excelTemplate}>
+                    <Download size={15} /> Excel 模板
+                  </button>
+                  <a
+                    className="text-button"
+                    href="/templates/questions.md"
+                    download
+                  >
+                    <Download size={15} /> Markdown 模板
+                  </a>
+                </div>
               </div>
-            </div>
-            <div className="upload-area">
-              <Upload size={25} style={{ margin: "0 auto" }} />
-              <p>
-                {busy ? "正在处理文件…" : "选择 Excel、Markdown 或 Word 文件"}
+              <div className="upload-area">
+                <Upload size={25} style={{ margin: "0 auto" }} />
+                <p>
+                  {busy
+                    ? "正在处理文件…"
+                    : "选择 Excel、Markdown 或 Word 文件，可多选"}
+                </p>
+                <p className="muted">
+                  支持 .xlsx / .xls / .md / .docx / .doc · 一次最多 20
+                  个文件，单个文件不超过 8 MB、300 题
+                </p>
+                <input
+                  type="file"
+                  multiple
+                  aria-label="选择题库文件"
+                  accept=".xlsx,.xls,.md,.docx,.doc"
+                  disabled={busy}
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []);
+                    if (files.length) void upload(files);
+                    e.target.value = "";
+                  }}
+                />
+              </div>
+              <p className="muted spaced">
+                Word 与 Markdown
+                支持逐题填写答案，也支持在文末“答案”标题下集中填写，如“1.B　2.C”。
+                分区标题和“根据下表回答51—55题”这类共用材料会按题号识别；图片题需另行整理为文字。
               </p>
-              <p className="muted">
-                支持 .xlsx / .xls / .md / .docx / .doc · 单个文件不超过 8
-                MB，每次最多 300 题
-              </p>
-              <input
-                type="file"
-                aria-label="选择题库文件"
-                accept=".xlsx,.xls,.md,.docx,.doc"
-                disabled={busy}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) void upload(f);
-                  e.target.value = "";
-                }}
-              />
             </div>
-            <p className="muted spaced">
-              Word 与 Markdown
-              支持逐题填写答案，也支持在文末“答案”标题下集中填写，如“1.B　2.C”。
-              分区标题和“根据下表回答51—55题”这类共用材料会按题号识别；图片题需另行整理为文字。
-            </p>
-          </div>
+          )}
           {loading ? (
             <p className="empty-note">正在读取题库…</p>
           ) : banks.length ? (

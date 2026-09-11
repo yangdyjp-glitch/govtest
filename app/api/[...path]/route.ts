@@ -297,7 +297,17 @@ export async function POST(req: Request) {
         }
         const errors = validateQuestions(body.questions);
         if (errors.length) throw new HttpError(400, errors.join("；"));
-        const id = p[2] || crypto.randomUUID();
+        const importing = body.action === "import";
+        if (
+          importing &&
+          (p[2] ||
+            typeof body.importKey !== "string" ||
+            !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(
+              body.importKey,
+            ))
+        )
+          throw new HttpError(400, "导入标识无效，请重新选择文件");
+        const id = p[2] || (importing ? body.importKey : crypto.randomUUID());
         let previous: Question[] = [];
         if (p[2]) {
           const old = await d
@@ -342,7 +352,8 @@ export async function POST(req: Request) {
         else
           await d
             .prepare(
-              "INSERT INTO banks (id,title,description,questions,count,created_at) VALUES (?,?,?,?,?,?)",
+              "INSERT INTO banks (id,title,description,questions,count,created_at) VALUES (?,?,?,?,?,?)" +
+                (importing ? " ON CONFLICT (id) DO NOTHING" : ""),
             )
             .bind(
               id,
@@ -353,6 +364,13 @@ export async function POST(req: Request) {
               new Date().toISOString(),
             )
             .run();
+        if (importing) {
+          const saved = await d
+            .prepare("SELECT id,title,count FROM banks WHERE id=?")
+            .bind(id)
+            .first();
+          return json(saved);
+        }
         return json({ id, count: questions.length });
       }
       if (p[1] === "users") {

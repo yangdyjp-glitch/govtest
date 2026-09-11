@@ -384,6 +384,54 @@ const newBank = await req("admin/banks", {
   description: "test",
   questions: parsed.questions,
 });
+const batchCountBefore = (await req("admin/banks")).length;
+const bulkItems = [parsed, central].map((data, index) => ({
+  action: "import",
+  importKey: crypto.randomUUID(),
+  title: `批量导入验证 ${index + 1}`,
+  description: "混合题库批量保存验证",
+  questions: data.questions,
+}));
+for (const item of bulkItems) {
+  const saved = await req("admin/banks", item);
+  check(
+    saved.id === item.importKey && saved.count === item.questions.length,
+    "batch item saves separately",
+  );
+  const snapshot = await req(`admin/banks/${saved.id}`);
+  const repeated = await req("admin/banks", item);
+  check(repeated.id === saved.id, "retry returns the same bank");
+  check(
+    JSON.stringify(await req(`admin/banks/${saved.id}`)) ===
+      JSON.stringify(snapshot),
+    "retry preserves saved questions and IDs",
+  );
+}
+check(
+  (await req("admin/banks")).length === batchCountBefore + 2,
+  "retry does not duplicate batch banks",
+);
+await req(
+  "admin/banks",
+  { ...bulkItems[0], importKey: crypto.randomUUID() },
+  learner,
+  403,
+);
+await req("admin/banks", { ...bulkItems[0], importKey: "invalid" }, owner, 400);
+await req(
+  "admin/banks",
+  {
+    ...bulkItems[0],
+    importKey: crypto.randomUUID(),
+    questions: invalid.questions,
+  },
+  owner,
+  400,
+);
+check(
+  (await req("admin/banks")).length === batchCountBefore + 2,
+  "failed items create no banks",
+);
 const snap = await req("attempts", { bankId: newBank.id }, learner);
 const updated = structuredClone(parsed.questions);
 updated[0].answer = "D";

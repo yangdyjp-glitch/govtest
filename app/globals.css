@@ -670,6 +670,32 @@ textarea {
   max-width: 100%;
   margin: auto;
 }
+.batch-import-table {
+  margin-bottom: 28px;
+}
+.batch-import-table td {
+  vertical-align: top;
+  white-space: normal;
+}
+.batch-import-table td:first-child {
+  width: 32%;
+}
+.batch-import-table td:nth-child(3) {
+  width: 36%;
+}
+.batch-import-table td:last-child {
+  white-space: nowrap;
+}
+.batch-filename {
+  margin-bottom: 8px;
+  overflow-wrap: anywhere;
+}
+.batch-issue {
+  margin-top: 8px;
+  font-size: 14px;
+  color: #65551e;
+  overflow-wrap: anywhere;
+}
 .subheading {
   display: flex;
   align-items: center;
