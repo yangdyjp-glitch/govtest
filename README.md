@@ -28,7 +28,7 @@ npm run dev
 
 ## Railway 部署
 
-GitHub main 分支通过 Railway 自动部署。仓库根目录包含 `Dockerfile` 和 `railway.json`，使用 Node.js 24 与 Next.js standalone 服务。
+GitHub main 分支通过 Railway 自动部署。仓库根目录的 `Dockerfile` 使用 Node.js 24 与 Next.js standalone 服务。Railway 服务设置使用 Dockerfile 构建，健康检查为 `/api/health`、等待上限 180 秒，失败重启最多 5 次。
 
 - 持久化卷挂载到 `/data`；单副本运行 SQLite，数据库和会话在服务重启、版本更新后保留。
 - `PORT=8080`，域名目标端口也设为 8080。
