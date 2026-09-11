@@ -2,7 +2,7 @@
 
 公务员考试桌面网页答题应用。宋体中文、Times New Roman 数字与字母，黑白灰黄界面。
 
-正式地址：https://govtest-production.up.railway.app
+正式地址：https://govtest.up.railway.app
 
 ## 使用
 
@@ -34,7 +34,7 @@ GitHub main 分支通过 Railway 自动部署。仓库根目录的 `Dockerfile` 
 - `DATABASE_URL` 在 Railway 变量中配置 PostgreSQL 连接串，密码只在服务端使用，不写入前端或仓库。
 - `DATABASE_SCHEMA=govtest`，连接池最多 5 个连接。SSL 验证证书与主机名，Supabase CA 证书位于 `db/certs/`；其他服务可使用 `DATABASE_CA_CERT` 配置 CA。
 - `PORT=8080`，域名目标端口也设为 8080。
-- `APP_URL=https://govtest-production.up.railway.app`，供写请求来源校验使用。
+- `APP_URL=https://govtest.up.railway.app`，供写请求来源校验使用。
 - `INITIAL_ADMIN_USERNAME=admin`。
 - `INITIAL_ADMIN_PASSWORD_HASH` 为 scrypt 密码哈希，只在空数据库首次初始化时使用，格式为 `scrypt$盐值$哈希`。本地 setup 生成的 `.env.local` 对 `$` 有 dotenv 转义；设置 Railway 原始变量时去掉这些转义反斜杠。
 - 生产环境保持 Secure Cookie 默认值，不设置 `COOKIE_SECURE=false`。
