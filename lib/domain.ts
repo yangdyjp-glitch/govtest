@@ -36,6 +36,7 @@ export type ResultItem = {
   outcome: Outcome;
 };
 export type User = {
+  username?: string;
   id: string;
   email: string;
   name: string;

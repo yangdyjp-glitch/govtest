@@ -22,6 +22,8 @@ import {
   type AnswerState,
 } from "@/lib/domain";
 import { parseFile } from "@/lib/importer";
+import { createAccount, resetPassword } from "@/lib/auth";
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 function path(req: Request) {
   return new URL(req.url).pathname.replace(/^\/api\//, "").split("/");
@@ -100,17 +102,11 @@ export async function GET(req: Request) {
           users: (
             await d
               .prepare(
-                "SELECT id,email,name,role,disabled,created_at AS createdAt FROM users ORDER BY created_at",
+                "SELECT u.id,u.email,u.name,u.role,u.disabled,u.created_at AS createdAt,c.username FROM users u JOIN credentials c ON c.user_id=u.id ORDER BY u.created_at",
               )
               .all()
           ).results,
-          invitations: (
-            await d
-              .prepare(
-                "SELECT * FROM invitations WHERE email NOT IN (SELECT email FROM users)",
-              )
-              .all()
-          ).results,
+          invitations: [],
         });
     }
     throw new HttpError(404, "页面不存在");
@@ -351,39 +347,18 @@ export async function POST(req: Request) {
         return json({ id, count: questions.length });
       }
       if (p[1] === "users") {
-        if (body.action === "invite") {
-          const email = String(body.email || "")
-              .trim()
-              .toLowerCase(),
-            name = String(body.name || "").trim();
-          if (
-            !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
-            email.length > 254 ||
-            !name ||
-            name.length > 80 ||
-            !["user", "admin"].includes(body.role)
-          )
-            throw new HttpError(400, "请填写有效的姓名、邮箱和角色");
-          if (
-            await d
-              .prepare("SELECT id FROM users WHERE email=?")
-              .bind(email)
-              .first()
-          )
-            throw new HttpError(400, "该用户已存在，请在用户列表中修改");
-          await d
-            .prepare(
-              "INSERT INTO invitations (email,name,role) VALUES (?,?,?) ON CONFLICT(email) DO UPDATE SET name=excluded.name,role=excluded.role",
-            )
-            .bind(email, name, body.role)
-            .run();
-          return json({ ok: true });
+        if (body.action === "create") {
+          return json(
+            await createAccount({
+              username: body.username,
+              password: body.password,
+              name: body.name,
+              role: body.role,
+            }),
+          );
         }
-        if (body.action === "revoke") {
-          await d
-            .prepare("DELETE FROM invitations WHERE email=?")
-            .bind(String(body.email))
-            .run();
+        if (body.action === "password") {
+          await resetPassword(String(body.id), body.password);
           return json({ ok: true });
         }
         if (body.action === "update") {

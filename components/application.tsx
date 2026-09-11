@@ -4,7 +4,9 @@ import { BookOpen, ChevronRight, LogOut, RefreshCw, Play } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Exam } from "./exam";
 import { Results, WrongBook } from "./results";
-import { Banks, UserAdmin } from "./admin";
+import { Banks } from "./admin";
+import { UserAdmin } from "./user-admin";
+import { LoginForm, AccountControls } from "./login";
 import { api, ApiError } from "@/lib/client";
 import type { User, Bank, Attempt } from "@/lib/domain";
 type Bootstrap = {
@@ -102,13 +104,7 @@ export default function Application() {
           <h1>公务员考试在线答题</h1>
           <p className="muted">{error || "正在连接你的研习空间…"}</p>
           {unauthorized ? (
-            <a
-              href="/signin-with-chatgpt?return_to=/"
-              target="_top"
-              className="button primary"
-            >
-              登录研习空间 <ChevronRight size={16} />
-            </a>
+            <LoginForm onSuccess={() => void refresh()} />
           ) : (
             error && (
               <button className="button" onClick={() => void refresh()}>
@@ -144,18 +140,11 @@ export default function Application() {
           )}
         </TabsList>
         <div className="user-badge">
-          <span className="account-email" title={data.user.email}>
+          <span className="account-email" title={data.user.username}>
             {data.user.name}
           </span>
           <span className="role-label">{admin ? "admin" : "user"}</span>
-          <a
-            href="/signout-with-chatgpt?return_to=/"
-            target="_top"
-            aria-label="退出登录"
-            title="退出登录"
-          >
-            <LogOut size={16} />
-          </a>
+          <AccountControls />
         </div>
       </header>
       <main className="workspace">

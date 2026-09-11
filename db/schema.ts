@@ -66,3 +66,12 @@ export const events = sqliteTable(
   },
   (t) => [index("events_attempt").on(t.attemptId)],
 );
+export const credentials = sqliteTable('credentials', {
+  userId: text('user_id').primaryKey().references(()=>users.id),
+  username: text('username').notNull(),
+  passwordHash: text('password_hash').notNull(),
+},t=>[uniqueIndex('credentials_username').on(t.username)]);
+export const sessions = sqliteTable('sessions', {
+  tokenHash: text('token_hash').primaryKey(), userId: text('user_id').notNull().references(()=>users.id), expiresAt: integer('expires_at').notNull(),
+},t=>[index('sessions_user').on(t.userId),index('sessions_expiry').on(t.expiresAt)]);
+export const loginAttempts = sqliteTable('login_attempts', {key:text('key').primaryKey(),attempts:integer('attempts').notNull(),expiresAt:integer('expires_at').notNull()});

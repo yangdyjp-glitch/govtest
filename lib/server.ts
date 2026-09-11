@@ -1,5 +1,7 @@
-import { env } from "cloudflare:workers";
-import { getChatGPTUser } from "@/app/chatgpt-auth";
+import { database } from "./database";
+import { sessionUser } from "./auth";
+import { HttpError } from "./http";
+export { HttpError } from "./http";
 import {
   classify,
   newStates,
@@ -8,17 +10,8 @@ import {
   type ResultItem,
 } from "./domain";
 import { demoQuestions } from "./demo";
-export class HttpError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-  ) {
-    super(message);
-  }
-}
 export function db() {
-  if (!env.DB) throw new HttpError(503, "数据服务暂不可用，请稍后重试");
-  return env.DB;
+  return database();
 }
 export const json = (data: unknown, status = 200) =>
   Response.json(data, {
@@ -42,7 +35,13 @@ export async function guarded(fn: () => Promise<Response>) {
 }
 export function sameOrigin(req: Request) {
   const origin = req.headers.get("origin");
-  if (origin && origin !== new URL(req.url).origin)
+  const expected = process.env.APP_URL
+    ? new URL(process.env.APP_URL).origin
+    : new URL(req.url).origin;
+  if (
+    req.headers.get("sec-fetch-site") === "cross-site" ||
+    (origin && origin !== expected)
+  )
     throw new HttpError(403, "请求来源不匹配");
 }
 export async function readUpload(req: Request) {
@@ -72,47 +71,9 @@ export async function readUpload(req: Request) {
   return bytes;
 }
 export async function currentUser(admin = false): Promise<User> {
-  const identity = await getChatGPTUser();
-  if (!identity) throw new HttpError(401, "请先登录");
-  const d = db(),
-    email = identity.email.toLowerCase();
-  let user = await d
-    .prepare("SELECT * FROM users WHERE id=?")
-    .bind(identity.userId)
-    .first<User>();
-  if (!user) {
-    // The site is owner-private at creation. The singleton claim is atomic.
-    await d
-      .prepare("INSERT OR IGNORE INTO settings (key,value) VALUES ('owner',?)")
-      .bind(identity.userId)
-      .run();
-    const owner = await d
-      .prepare("SELECT value FROM settings WHERE key='owner'")
-      .first<{ value: string }>();
-    const invite = await d
-      .prepare("SELECT * FROM invitations WHERE email=?")
-      .bind(email)
-      .first<{ name: string; role: string }>();
-    if (owner?.value !== identity.userId && !invite)
-      throw new HttpError(403, "此账号尚未获准使用，请联系管理员添加你的邮箱");
-    await d
-      .prepare(
-        "INSERT OR IGNORE INTO users (id,email,name,role,created_at) VALUES (?,?,?,?,?)",
-      )
-      .bind(
-        identity.userId,
-        email,
-        invite?.name || identity.fullName || email,
-        owner?.value === identity.userId ? "admin" : invite!.role,
-        new Date().toISOString(),
-      )
-      .run();
-    user = await d
-      .prepare("SELECT * FROM users WHERE id=?")
-      .bind(identity.userId)
-      .first<User>();
-  }
-  if (!user || user.disabled) throw new HttpError(403, "账号已停用");
+  const user = await sessionUser();
+  if (!user) throw new HttpError(401, "请先登录");
+  if (user.disabled) throw new HttpError(403, "账号已停用");
   if (admin && user.role !== "admin")
     throw new HttpError(403, "仅管理员可以执行此操作");
   return user;

@@ -3,20 +3,18 @@ import * as XLSX from "xlsx";
 import JSZip from "jszip";
 import { readFile } from "node:fs/promises";
 const origin = "http://127.0.0.1:8788";
-const owner = { id: "qa-owner", email: "qa-owner@sites.test" };
-const learner = { id: "qa-learner", email: "qa-learner@sites.test" };
+const owner = {
+  username: "qa-owner",
+  password: process.env.TEST_ADMIN_PASSWORD,
+};
+const learner = { username: "qa-learner", password: "Integration-learner-42" };
 let checks = 0;
 function check(condition, message) {
   assert.ok(condition, message);
   checks++;
 }
 async function req(path, body, identity = owner, expected = 200) {
-  const headers = identity
-    ? {
-        "oai-authenticated-user-id": identity.id,
-        "oai-authenticated-user-email": identity.email,
-      }
-    : {};
+  const headers = identity?.cookie ? { Cookie: identity.cookie } : {};
   let payload = body;
   if (body !== undefined && !(body instanceof FormData)) {
     headers["Content-Type"] = "application/json";
@@ -32,19 +30,50 @@ async function req(path, body, identity = owner, expected = 200) {
   checks++;
   return data;
 }
+async function signIn(identity) {
+  const r = await fetch(origin + "/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(identity),
+  });
+  assert.equal(r.status, 200, await r.text());
+  const cookie = r.headers.get("set-cookie");
+  check(
+    cookie.includes("HttpOnly") && cookie.includes("SameSite=strict"),
+    "session cookie protected",
+  );
+  identity.cookie = cookie.split(";")[0];
+}
 await req("bootstrap", undefined, null, 401);
+await signIn(owner);
 const boot = await req("bootstrap");
-check(boot.user.role === "admin", "first private-site user is admin");
+owner.id = boot.user.id;
+check(boot.user.role === "admin", "configured initial account is admin");
 await req("admin/users", {
-  action: "invite",
-  email: learner.email,
+  action: "create",
+  username: learner.username,
+  password: learner.password,
   name: "测试学员",
   role: "user",
-}).catch(async (e) => {
-  const state = await req("admin/users");
-  if (!state.users.some((x) => x.id === learner.id)) throw e;
 });
-await req("bootstrap", undefined, learner);
+await signIn(learner);
+learner.id = (await req("bootstrap", undefined, learner)).user.id;
+const forged = await fetch(origin + "/api/bootstrap", {
+  headers: {
+    "oai-authenticated-user-id": owner.id,
+    "oai-authenticated-user-email": "qa-owner",
+  },
+});
+check(forged.status === 401, "identity headers cannot bypass authentication");
+const crossSite = await fetch(origin + "/api/auth/login", {
+  method: "POST",
+  headers: {
+    Origin: "https://evil.example",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify(owner),
+});
+check(crossSite.status === 403, "cross-origin mutation rejected");
 await req("admin/banks", undefined, learner, 403);
 await req("admin/users", undefined, learner, 403);
 await req("admin/demo", {}, learner, 403);
@@ -60,7 +89,7 @@ await req(
   `attempts/${a.id}`,
   undefined,
   { id: "qa-stranger", email: "stranger@sites.test" },
-  403,
+  401,
 );
 await req(
   `attempts/${a.id}/sync`,
@@ -127,8 +156,7 @@ const races = await Promise.all(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "oai-authenticated-user-id": learner.id,
-        "oai-authenticated-user-email": learner.email,
+        Cookie: learner.cookie,
       },
       body: JSON.stringify({ revision: a.revision, events: [e] }),
     });
@@ -230,8 +258,7 @@ async function upload(filename, buffer, identity = owner, expected = 200) {
       "Content-Type": "application/octet-stream",
       Connection: "close",
       "X-File-Name": encodeURIComponent(filename),
-      "oai-authenticated-user-id": identity.id,
-      "oai-authenticated-user-email": identity.email,
+      Cookie: identity.cookie,
     },
     body: typeof buffer === "string" ? Buffer.from(buffer) : buffer,
   });
@@ -308,7 +335,7 @@ const docBuffer = await readFile(
 const legacy = await upload("test.doc", docBuffer);
 check(
   Array.isArray(legacy.questions) && legacy.warnings.length > 0,
-  "legacy DOC extractor works in Worker",
+  "legacy DOC extractor works in Node",
 );
 const invalid = await upload("test.md", "1. 缺少选项\nA. 甲\n答案：AB");
 check(invalid.errors.length > 0, "invalid import produces reviewable errors");
@@ -353,6 +380,30 @@ await req("admin/users", {
   role: "user",
   disabled: false,
 });
+await req("admin/users", {
+  action: "password",
+  id: learner.id,
+  password: "Reset-learner-password-42",
+});
+await req("bootstrap", undefined, learner, 401);
+await req(
+  "auth/login",
+  { username: learner.username, password: learner.password },
+  null,
+  401,
+);
+learner.password = "Reset-learner-password-42";
+await signIn(learner);
+await req(
+  "auth/password",
+  { oldPassword: learner.password, password: "Changed-learner-password-42" },
+  learner,
+);
+await req("bootstrap", undefined, learner, 401);
+learner.password = "Changed-learner-password-42";
+await signIn(learner);
+await req("auth/logout", {}, learner);
+await req("bootstrap", undefined, learner, 401);
 console.log(
   `Passed ${checks} integration checks: permissions, submission, classification, timing, sync conflicts, immutable snapshots, wrong-book review and all five file extensions.`,
 );
