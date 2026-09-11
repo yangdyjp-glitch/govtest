@@ -320,33 +320,37 @@ export function Exam({
               {state.flagged ? "取消待检查" : "标记待检查"}
             </button>
           </div>
-          <div className="question-content">
+          <div
+            className={`question-content${q.material ? " with-material" : ""}`}
+          >
             {q.material && <QuestionMaterial text={q.material} />}
-            <div className="question-title">
-              <span className="question-index">
-                {String(index + 1).padStart(2, "0")}
-              </span>
-              <h2 id="question-stem">{q.stem}</h2>
+            <div className="question-reading">
+              <div className="question-title">
+                <span className="question-index">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+                <h2 id="question-stem">{q.stem}</h2>
+              </div>
+              <RadioGroup
+                aria-labelledby="question-stem"
+                value={selected || ""}
+                onValueChange={choose}
+                className="options"
+              >
+                {letters.map((k) => (
+                  <label
+                    key={`${q.id}-${k}`}
+                    htmlFor={`answer-${k}`}
+                    className={`option ${selected === k ? "selected" : ""}`}
+                  >
+                    <RadioGroupItem value={k} id={`answer-${k}`} />
+                    <span className="option-letter">{k}</span>
+                    <span className="option-copy">{q.options[k]}</span>
+                    {selected === k && <Check size={18} />}
+                  </label>
+                ))}
+              </RadioGroup>
             </div>
-            <RadioGroup
-              aria-labelledby="question-stem"
-              value={selected || ""}
-              onValueChange={choose}
-              className="options"
-            >
-              {letters.map((k) => (
-                <label
-                  key={`${q.id}-${k}`}
-                  htmlFor={`answer-${k}`}
-                  className={`option ${selected === k ? "selected" : ""}`}
-                >
-                  <RadioGroupItem value={k} id={`answer-${k}`} />
-                  <span className="option-letter">{k}</span>
-                  <span style={{ whiteSpace: "pre-wrap" }}>{q.options[k]}</span>
-                  {selected === k && <Check size={18} />}
-                </label>
-              ))}
-            </RadioGroup>
           </div>
           <footer className="question-footer">
             <button

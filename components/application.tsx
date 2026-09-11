@@ -182,18 +182,9 @@ export default function Application() {
                     <h2>继续上次练习</h2>
                     <span className="muted">答案与标记已保存</span>
                   </div>
-                  <div className="stack" style={{ marginBottom: 28 }}>
+                  <div className="resume-grid">
                     {data.active.map((a) => (
-                      <div
-                        className="panel"
-                        key={a.id}
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          padding: "20px 26px",
-                        }}
-                      >
+                      <div className="panel resume-card" key={a.id}>
                         <div>
                           <h3>{a.title}</h3>
                           <p className="muted">

@@ -34,6 +34,8 @@
   --yellow: #e4c650;
   --yellow-light: #faf5dd;
   --muted: #72726c;
+  --page-gutter: clamp(28px, 3vw, 72px);
+  --panel-gutter: clamp(24px, 2vw, 40px);
   color-scheme: light;
 }
 * {
@@ -113,14 +115,14 @@ textarea {
   background: #efe096;
 }
 .site-header {
-  height: 83px;
+  height: 76px;
   background: #fff;
   border-top: 4px solid #292925;
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
-  gap: 35px;
-  padding: 0 42px;
+  gap: 28px;
+  padding: 0 var(--page-gutter);
 }
 .brand {
   display: flex;
@@ -167,18 +169,22 @@ textarea {
   font-size: 12px;
 }
 .workspace {
-  max-width: 1460px;
-  margin: 0 auto;
-  padding: 35px 48px 50px;
+  width: 100%;
+  min-height: calc(100dvh - 140px);
+  padding: 28px var(--page-gutter) 40px;
 }
 .page-heading {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 24px;
-  margin-bottom: 28px;
+  margin-bottom: 24px;
+}
+.page-heading > div:first-child {
+  min-width: 0;
 }
 .page-heading h1 {
+  overflow-wrap: anywhere;
   margin: 6px 0;
 }
 .eyebrow {
@@ -192,8 +198,8 @@ textarea {
 }
 .exam-layout {
   display: grid;
-  grid-template-columns: 254px minmax(0, 1fr);
-  gap: 25px;
+  grid-template-columns: clamp(250px, 16vw, 300px) minmax(0, 1fr);
+  gap: 24px;
   align-items: start;
 }
 .answer-card {
@@ -202,6 +208,8 @@ textarea {
   padding: 23px 21px;
   position: sticky;
   top: 22px;
+  max-height: calc(100dvh - 44px);
+  overflow-y: auto;
 }
 .section-head {
   display: flex;
@@ -232,14 +240,15 @@ textarea {
 }
 .number-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 9px;
-  padding: 25px 0;
-  max-height: 420px;
+  padding: 25px 6px 25px 0;
+  max-height: clamp(140px, calc(100dvh - 580px), 520px);
   overflow: auto;
 }
 .question-number {
   position: relative;
+  min-width: 0;
   border: 1px solid #dadad2;
   aspect-ratio: 1;
   background: #fff;
@@ -284,7 +293,8 @@ textarea {
 .question-panel {
   border: 1px solid var(--border);
   background: #fff;
-  min-height: 625px;
+  min-width: 0;
+  min-height: clamp(500px, calc(100dvh - 268px), 880px);
   display: flex;
   flex-direction: column;
 }
@@ -292,7 +302,7 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 31px;
+  padding: 16px var(--panel-gutter);
   border-bottom: 1px solid var(--border);
   font-size: 14px;
   color: #595952;
@@ -322,8 +332,11 @@ textarea {
   color: #3c351b;
 }
 .question-content {
-  padding: 30px 38px 36px;
+  padding: 28px var(--panel-gutter) 32px;
   flex: 1;
+}
+.question-reading {
+  min-width: 0;
 }
 .question-title {
   display: flex;
@@ -335,12 +348,16 @@ textarea {
   font-size: 32px;
   color: #8b8b7f;
   line-height: 1;
+  flex-shrink: 0;
 }
 .question-title h2 {
-  font-size: 19px;
+  min-width: 0;
+  max-width: 52em;
+  font-size: 20px;
   line-height: 1.9;
   font-weight: 400;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .stem {
   font-size: 19px;
@@ -402,6 +419,13 @@ textarea {
 .option-letter {
   font-size: 19px;
   min-width: 14px;
+  flex-shrink: 0;
+}
+.option-copy {
+  min-width: 0;
+  max-width: 58em;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .option > svg:last-child {
   margin-left: auto;
@@ -411,7 +435,7 @@ textarea {
   align-items: center;
   justify-content: space-between;
   border-top: 1px solid var(--border);
-  padding: 20px 31px;
+  padding: 16px var(--panel-gutter);
   background: #fdfdfb;
 }
 .button {
@@ -447,8 +471,7 @@ textarea {
   width: 100%;
 }
 .site-footer {
-  max-width: 1364px;
-  margin: auto;
+  margin: 0 var(--page-gutter);
   display: flex;
   justify-content: space-between;
   padding: 20px 0;
@@ -602,6 +625,9 @@ textarea {
 .result-detail .stem {
   font-size: 18px;
 }
+.result-detail > :is(.stem, .result-options, .analysis, .material, .form-row) {
+  max-width: 1200px;
+}
 .result-options {
   display: grid;
   gap: 8px;
@@ -624,13 +650,14 @@ textarea {
 }
 .bank-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
   gap: 20px;
 }
 .bank-card {
   border: 1px solid var(--border);
   background: #fff;
-  padding: 26px;
+  min-width: 0;
+  padding: 24px;
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -642,6 +669,34 @@ textarea {
 }
 .bank-card h2 {
   font-size: 21px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.bank-card .card-top > :last-child {
+  flex-shrink: 0;
+}
+.bank-card > p {
+  overflow-wrap: anywhere;
+}
+.resume-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(500px, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+.resume-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 20px 24px;
+}
+.resume-card > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.resume-card .button {
+  flex-shrink: 0;
 }
 .bank-card footer {
   display: flex;
@@ -711,7 +766,7 @@ textarea {
 .nav-tabs [data-slot="tabs-list"] {
   background: transparent;
   padding: 0;
-  height: 78px;
+  height: 71px;
   gap: 26px;
   border-radius: 0;
 }
@@ -816,4 +871,30 @@ textarea {
   padding: 30px;
   color: var(--muted);
   text-align: center;
+}
+
+@media (max-height: 850px) {
+  .workspace {
+    padding-top: 20px;
+  }
+  .page-heading {
+    margin-bottom: 20px;
+  }
+  .question-content {
+    padding-top: 24px;
+    padding-bottom: 24px;
+  }
+}
+
+@media (min-width: 1800px) {
+  .question-content.with-material {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+    gap: 32px;
+  }
+  .question-content.with-material > .material {
+    min-width: 0;
+    margin-bottom: 0;
+  }
 }
